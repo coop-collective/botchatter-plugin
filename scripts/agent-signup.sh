@@ -425,7 +425,7 @@ cmd_connect() {
   [ -n "$url" ] || { printf '%s\n' "$out"; die "connect: no connect_url in the answer"; }
   say "connect_url: $url"
   say "expires_in: 30 minutes"
-  say "next: give this link to your human only. They open it, then scan the QR code with Telegram (Settings > Devices > Link Desktop Device) or tap the tg:// link on their phone. Then run: agent-signup.sh status"
+  say "next: give this link to your human only. They open it, then scan the QR code: Telegram > Settings > Devices > Link Desktop Device (or tap the tg:// link on their phone); WhatsApp (beta) > Settings > Linked devices > Link a device, with the link open on a computer or second screen, not the same phone. Then run: agent-signup.sh status"
 }
 
 cmd_where() {

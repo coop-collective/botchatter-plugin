@@ -289,7 +289,7 @@ function Cmd-Connect {
   if (-not $inner.connect_url) { Say $out; Fail 'connect: no connect_url in the answer' }
   Say "connect_url: $($inner.connect_url)"
   Say 'expires_in: 30 minutes'
-  Say 'next: give this link to your human only. They open it, then scan the QR code with Telegram (Settings > Devices > Link Desktop Device) or tap the tg:// link on their phone. Then run: agent-signup.ps1 status'
+  Say 'next: give this link to your human only. They open it, then scan the QR code: Telegram > Settings > Devices > Link Desktop Device (or tap the tg:// link on their phone); WhatsApp (beta) > Settings > Linked devices > Link a device, with the link open on a computer or second screen, not the same phone. Then run: agent-signup.ps1 status'
 }
 
 function Cmd-Call([string]$Tool, [string]$ArgsJson) {

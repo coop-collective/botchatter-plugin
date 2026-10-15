@@ -1,12 +1,15 @@
 # Social Connect plugin for Claude Code and Codex
 
-Social Connect lets your AI assistant read your own Telegram chats (personal WhatsApp is coming)
-and propose replies that you approve yourself. It is a hosted remote MCP server: you sign in with
-an email code, connect Telegram by scanning a QR code, and then ask your assistant to catch you
+Social Connect lets your AI assistant read your own Telegram and personal WhatsApp chats and
+propose replies that you approve yourself. It is a hosted remote MCP server: you sign in with an
+email code, connect Telegram or WhatsApp by scanning a QR code, and then ask your assistant to catch you
 up, summarize a chat or draft a reply. Nothing is ever sent unless you approve it in the Social
-Connect web app, and reads never mark your messages as read. For Telegram, your messages,
-contacts and connection credentials are encrypted with a key that only you, and the AI apps you
-connect, can unlock; we don't keep that key. Personal WhatsApp is coming soon.
+Connect web app, and reads never mark your messages as read. Your messages, contacts and
+connection credentials are encrypted with a key that only you, and the AI apps you connect, can
+unlock; we don't keep that key. We connect to WhatsApp only while you're using your assistant;
+messages that arrive while you're away are fetched next time, within WhatsApp's limits.
+
+**WhatsApp support is beta:** it has not yet been tested against a real account.
 
 This plugin connects Claude Code or Codex to that server and teaches the agent how to use it:
 when to read (only when you ask), how much (bounded reads), how to summarize, how to propose a
@@ -33,7 +36,7 @@ codex plugin add social-connect@social-connect
 `claude plugin update social-connect@social-connect`. Codex: `codex plugin marketplace upgrade
 social-connect`, then `codex plugin add social-connect@social-connect`.
 
-## Sign in and connect Telegram
+## Sign in and connect Telegram or WhatsApp
 
 The plugin registers one MCP server, `social-connect`, at `https://staging.cooposio.com/mcp` over
 HTTP with OAuth (no header, no token in a file). Sign in once:
@@ -49,6 +52,13 @@ unlocks your data in a new browser). If no Telegram account is connected yet, th
 Telegram**: read the disclosure, then scan the QR code with Telegram on your phone
 (**Settings → Devices → Link Desktop Device**), or tap the `tg://` link if you are on the phone.
 The browser then returns you to your assistant. Skipped it? Run `/social-connect:connect`.
+
+**WhatsApp (beta):** `/social-connect:connect whatsapp` (or "Allow and connect WhatsApp" when
+signing in). Open the link on a computer or a second screen, not on your phone, then in
+WhatsApp on the phone go to **Settings → Linked devices → Link a device** and scan the QR code.
+WhatsApp only has the messages that arrived while it was connected, so older history may be
+missing; the assistant will say so.
+
 A connect link is valid for 30 minutes and also unlocks your encrypted data for 2 hours, so
 keep it to yourself.
 
@@ -56,8 +66,8 @@ keep it to yourself.
 
 | Piece | What it does |
 |---|---|
-| Skill `social-connect` | Loaded when you ask about your Telegram messages, connecting an account, or Social Connect: the tools, the sign-in and connect flow, agent sign-up, and etiquette (ask first, at most 20 chats and 30 messages per call, summarize rather than dump, never pressure you to approve, give the connect link when not connected, wait out rate limits). |
-| `/social-connect:connect [telegram]` | Gets a 30-minute connect link from the MCP server and shows it to you only, with the QR steps. |
+| Skill `social-connect` | Loaded when you ask about your Telegram or WhatsApp messages, connecting an account, or Social Connect: the tools, the sign-in and connect flow, agent sign-up, and etiquette (ask first, at most 20 chats and 30 messages per call, summarize rather than dump, never pressure you to approve, give the connect link when not connected, wait out rate limits). |
+| `/social-connect:connect [telegram\|whatsapp]` | Gets a 30-minute connect link from the MCP server and shows it to you only, with the QR steps. |
 | `/social-connect:host <url>` | Uses a custom host (self-hosted, local or staging) for the MCP server and agent sign-up, saved across sessions; `--reset` goes back to the default. |
 | `.mcp.json` | The `social-connect` MCP server (HTTP, OAuth) at the plugin's `mcp_url` option (default `https://staging.cooposio.com/mcp`). Codex reads `.codex-plugin/plugin.json` and the literal `.codex-mcp.json` instead. |
 | `scripts/agent-signup.sh`, `.ps1` | Headless sign-up for an autonomous agent with its own mailbox (below). |
@@ -69,8 +79,8 @@ keep it to yourself.
 |---|---|
 | `connection_status` | Which accounts are connected |
 | `connect_account({provider})` | A 30-minute link (with a 2-hour device unlock) for you to open and scan the QR code |
-| `list_recent_chats({limit ≤ 20})` | Your most recent chats, newest first |
-| `read_recent_messages({chat_ref, limit ≤ 30})` | Recent text messages in one chat; never marks them read |
+| `list_recent_chats({limit ≤ 20, provider?})` | Your most recent chats across Telegram and WhatsApp, newest first, each with its `provider` |
+| `read_recent_messages({chat_ref, limit ≤ 30})` | `{provider, messages, sync?}`: recent text messages in one chat; never marks them read. WhatsApp's `sync.state: "partial"` means older messages may be missing |
 | `request_reply_approval({chat_ref, text})` | A pending reply you review, edit, approve or reject in the web app. Sending is disabled on staging |
 
 ## Agent sign-up (autonomous agents)
@@ -148,11 +158,11 @@ sh test/script-tests.sh        # manifests agree, shellcheck, offline checks of 
 | Feature | State |
 |---|---|
 | MCP OAuth (email code sign-in, DCR and CIMD), the five tools, 30 tool calls a minute per account | Staging (`https://staging.cooposio.com`) |
-| User-keyed encryption at rest for Telegram (recovery code, device unlock) | Built (connector HEAD); check staging is deployed |
+| User-keyed encryption at rest (recovery code, device unlock) | Built (connector HEAD); check staging is deployed |
 | Connect Telegram by QR inside the OAuth trip | Staging |
 | Agent sign-up (`/api/agent/*`, with the recovery code) | Built; check `GET <host>/api/agent/` answers JSON before relying on it |
 | Sending an approved reply | **Disabled** on staging (approval is recorded, nothing is sent) |
-| Personal WhatsApp | **Coming** |
+| Personal WhatsApp (connect by QR, merged chat list, partial-history `sync`) | **Beta**: built (connector HEAD), not yet tested against a real account |
 
 Update the skill, the snippet and this table when those change.
 

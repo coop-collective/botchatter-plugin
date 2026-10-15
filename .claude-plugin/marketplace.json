@@ -4,13 +4,13 @@
     "name": "Social Connect"
   },
   "metadata": {
-    "description": "Social Connect's plugin for Claude Code and Codex: read your own Telegram chats from your assistant through the Social Connect MCP server, with human approval for every reply."
+    "description": "Social Connect's plugin for Claude Code and Codex: read your own Telegram and WhatsApp chats from your assistant through the Social Connect MCP server, with human approval for every reply."
   },
   "plugins": [
     {
       "name": "social-connect",
       "source": "./",
-      "description": "Read your own Telegram chats (personal WhatsApp coming) from your assistant: connect by QR code, list recent chats, read recent messages, and propose replies you approve in the web app. Includes agent sign-up for autonomous agents.",
+      "description": "Read your own Telegram and personal WhatsApp (beta) chats from your assistant: connect by QR code, list recent chats, read recent messages, and propose replies you approve in the web app. Includes agent sign-up for autonomous agents.",
       "category": "productivity",
       "keywords": [
         "social-connect",

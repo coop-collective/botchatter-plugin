@@ -1,28 +1,34 @@
 ---
 name: social-connect
-description: Read the user's own Telegram chats (personal WhatsApp coming) through the Social Connect MCP server, and propose replies they approve themselves. Use when the user asks to catch up on, summarize, triage or search their recent Telegram messages, draft a reply to a Telegram chat, connect Telegram (or WhatsApp) to their assistant, sign in to Social Connect, or when an autonomous agent with its own mailbox needs a Social Connect account (agent sign-up). Also use on a Social Connect tool error (not connected, rate-limited, unauthorized). Not for sending messages directly, bulk messaging, or other people's accounts.
+description: Read the user's own Telegram and personal WhatsApp chats (WhatsApp in beta) through the Social Connect MCP server, and propose replies they approve themselves. Use when the user asks to catch up on, summarize, triage or search their recent Telegram or WhatsApp messages, draft a reply to a Telegram or WhatsApp chat, connect Telegram or WhatsApp to their assistant, sign in to Social Connect, or when an autonomous agent with its own mailbox needs a Social Connect account (agent sign-up). Also use on a Social Connect tool error (not connected, rate-limited, unauthorized). Not for sending messages directly, bulk messaging, or other people's accounts.
 ---
 
 # Social Connect
 
 Social Connect is a hosted remote MCP server (`social-connect`) that lets an assistant read the
-**user's own** Telegram chats and propose a reply that the user approves in the Social Connect
-web app. Personal WhatsApp is coming: `connect_account({provider: "whatsapp"})` currently answers
-"WhatsApp is coming soon". Default host: `https://staging.cooposio.com` (MCP at `/mcp`); a custom
+**user's own** Telegram and personal WhatsApp chats and propose a reply that the user approves
+in the Social Connect web app. **WhatsApp is beta**: it has not yet been tested against a real
+account, so say so when the user connects it or relies on it. Default host: `https://staging.cooposio.com` (MCP at `/mcp`); a custom
 host is set with `/social-connect:host <url>`.
 
 ## Tools (server `social-connect`)
 
 | Tool | Use |
 |---|---|
-| `connection_status()` | Call first. `{telegram: {state: connected \| not_connected \| revoked, account}}` |
-| `connect_account({provider: "telegram"})` | `{connect_url, expires_in_seconds: 1800}`: a link **for the human** to open |
-| `list_recent_chats({limit: 1..20 = 10})` | Newest first: `chat_ref`, `title`, `type`, `unread_count`, `last_message_at` |
-| `read_recent_messages({chat_ref, limit: 1..30 = 20})` | Text messages only, newest first (`id`, `from`, `date`, `text`). Never marks anything read |
+| `connection_status()` | Call first. `{telegram: {state, account}, whatsapp: {state, account, messages_synced}}` |
+| `connect_account({provider: "telegram" \| "whatsapp"})` | `{connect_url, expires_in_seconds: 1800}`: a link **for the human** to open |
+| `list_recent_chats({limit: 1..20 = 10, provider?})` | Newest first, both providers merged unless `provider` is given: `provider`, `chat_ref`, `title`, `type`, `unread_count` (null on WhatsApp), `last_message_at` |
+| `read_recent_messages({chat_ref, limit: 1..30 = 20})` | `{provider, messages: [{id, from, date, text}], sync?}`, text only, newest first. Never marks anything read |
 | `request_reply_approval({chat_ref, text})` | Creates a **pending** reply and returns `approval_url`. Nothing is sent |
 
-`chat_ref` is an opaque signed token bound to this user's account: pass it back unchanged, never
-invent or edit one. Full schemas and error texts: [references/mcp-tools.md](references/mcp-tools.md).
+`chat_ref` is an opaque signed token bound to this user's account (`cr1.…` Telegram, `wr1.…`
+WhatsApp): pass it back unchanged, never invent or edit one. Say which app a chat is from when
+you summarize across both.
+
+**WhatsApp history is partial.** WhatsApp only has the messages that arrived while it was
+connected. When `sync.state` is `"partial"`, older messages may be missing: say so ("I can only
+see messages since <oldest_synced>") instead of claiming there are none or that a conversation
+started there. Never infer silence from a partial sync. Full schemas and error texts: [references/mcp-tools.md](references/mcp-tools.md).
 
 ## (a) A person in Claude Code or Codex
 
@@ -38,7 +44,13 @@ invent or edit one. Full schemas and error texts: [references/mcp-tools.md](refe
    button reads "Allow and connect Telegram". They read the disclosure, then scan the QR code
    with Telegram on their phone (**Settings → Devices → Link Desktop Device**), or, on the phone
    itself, tap the `tg://` link. The browser then returns them to the assistant.
-3. **Later, or if it was skipped:** `/social-connect:connect`, or call `connect_account` and show
+3. **WhatsApp (beta):** call `connect_account({provider: "whatsapp"})` (or
+   `/social-connect:connect whatsapp`; the sign-in page also offers "Allow and connect WhatsApp").
+   The link opens `/connect/whatsapp`, which shows a QR code. In WhatsApp on the phone:
+   **Settings → Linked devices → Link a device**, then scan. The QR code must be shown on a
+   computer or another screen, **not on the same phone** that scans it. Mention that WhatsApp
+   support is beta and not yet tested against a real account.
+4. **Later, or if it was skipped:** `/social-connect:connect`, or call `connect_account` and show
    the `connect_url` (valid 30 minutes) to that person only. Wait until they say it is done, then
    `connection_status`. The link is sensitive (see "Connect links" below).
 
@@ -111,10 +123,13 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
   pressure, nag or hurry the person to approve; one mention is enough, and rejecting is fine.
   One reply per request: no bulk replies, no messages to chats the user did not choose.
 - **Not connected.** A tool error "Telegram is not connected. Ask the user to open <url> …"
-  already contains a connect link (sensitive, as above): show it to the user only, explain the QR step (Settings → Devices → Link Desktop
-  Device, or tap the `tg://` link on the phone), wait until they say it is done, then
-  `connection_status` and retry once. `state: revoked` means Telegram ended the session (for
-  example, the device was removed): call `connect_account` for a fresh link.
+  (or "WhatsApp is not connected. …") already contains a connect link (sensitive, as above):
+  show it to the user only, explain the QR step (Telegram: Settings → Devices → Link Desktop
+  Device, or tap the `tg://` link on the phone; WhatsApp: Settings → Linked devices → Link a
+  device, scanning a QR code shown on another screen), wait until they say it is done, then
+  `connection_status` and retry once. `state: revoked` means the app ended the session (for
+  example, the linked device was removed): call `connect_account` for a fresh link. WhatsApp
+  `state: locked` means it is paired and reconnects on the next read.
 - **Rate limits and flood waits.** "Rate limit: at most 30 Social Connect calls per minute"
   (per account), "Telegram is rate-limiting this account. Try again in N
   seconds/minutes/hours", or a sign-in 429 ("wait 30 seconds", "Wait a minute"): stop calling,
@@ -131,12 +146,14 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
 ## What to say about privacy
 
 Social Connect never sends without the owner's approval in the web app, and reads do not mark
-messages as read. For **Telegram** you may say, in these words: "Your messages, contacts and
+messages as read. For Telegram and WhatsApp you may say, in these words: "Your messages, contacts and
 connection credentials are encrypted with a key that only you, and the AI apps you connect, can
 unlock. We don't keep that key." Also: "When you disconnect, we delete the key, and anything left
 behind is permanently unreadable", and "To work, our servers process your messages in memory
-while your assistant is using them. We don't store them in a form we can read." Personal
-WhatsApp is coming soon; make no claims about it yet.
+while your assistant is using them. We don't store them in a form we can read." For WhatsApp,
+also: "We connect to WhatsApp only while you're using your assistant. Messages that arrive while
+you're away are fetched next time, within WhatsApp's limits." WhatsApp support is beta (not yet
+tested against a real account); say so rather than promising it works.
 
 Never say "end-to-end encrypted" or "zero-knowledge" (or "zero-access"), "we can never see your
 messages", "only you can unlock" (without "and the AI apps you connect"), "even if we're hacked
