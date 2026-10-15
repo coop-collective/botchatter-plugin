@@ -11,12 +11,13 @@ after the user approves it in the Social Connect web app, and then exactly once.
 account, so say so when the user connects it or relies on it. Default host: `https://staging.cooposio.com` (MCP at `/mcp`); a custom
 host is set with `/social-connect:host <url>`.
 
-## Tools (server `social-connect`, 17)
+## Tools (server `social-connect`, 22)
 
 | Need | Tool |
 |---|---|
 | Is anything connected? | `connection_status()`: call first |
-| Connect an account | `connect_account({provider})` → `connect_url` for the human (sensitive) |
+| Connect an account **in the chat** (preferred) | `start_connect({provider, method:"qr"\|"phone", accept_risks})` → QR image to scan; `check_connect({provider})` until connected (shows a fresh QR when it rotates); Telegram by phone: `connect_with_phone({phone})` then `submit_login_code({code})`; `cancel_connect` |
+| Connect an account in a browser (fallback) | `connect_account({provider})` → `connect_url` for the human (sensitive) |
 | What's new? | **`catch_up({provider?, since?, max_chats ≤ 20, per_chat ≤ 10})`**: one call, chats with activity since the last catch_up, each with its latest messages |
 | What needs my answer? | `get_mentions({provider?, limit ≤ 30})`: @mentions and replies to the user |
 | Find a chat by name | `find_chats({query, type?, provider?, limit ≤ 20})`, not only recent ones |
@@ -44,6 +45,22 @@ connected. When `sync.state` is `"partial"`, older messages may be missing: say 
 see messages since <oldest_synced>") instead of claiming there are none or that a conversation
 started there. Never infer silence from a partial sync. The same holds for `catch_up` and
 `search_messages` on WhatsApp: they only see captured messages.
+
+## Connecting inside the chat (preferred)
+
+When an account isn't connected, connect it right here instead of sending the user away:
+
+1. Ask: **"Scan a QR code, or verify with your phone number?"** (QR is the default; WhatsApp is QR only.)
+2. Call `start_connect({provider})` without `accept_risks`: it returns the risk disclosure. Show it, and only after the
+   user explicitly agrees call it again with `accept_risks: true`.
+3. **QR:** show the image it returns and the instructions (Telegram: Settings → Devices → Link Desktop Device; WhatsApp:
+   Settings → Linked devices → Link a device, scanned from the phone). Call `check_connect` every few seconds; if it
+   returns a new QR image (codes rotate every ~20-30 s), show the new one. Stop when it says `connected`.
+4. **Phone (Telegram):** `connect_with_phone({phone})`, then ask for the login code and call `submit_login_code`. Tell the
+   user first: Telegram says never to share login codes, and typing it here means the assistant provider sees it; offer QR
+   instead. If it returns `needs_password`, give the browser link it returns: **never ask for or accept the user's
+   Telegram password in chat.**
+5. If images don't show in this app, fall back to `connect_account` and give the link.
 
 ## (a) A person in Claude Code or Codex
 
