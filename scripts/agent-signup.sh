@@ -12,17 +12,24 @@
 #   agent-signup.sh status                        call the connection_status tool
 #   agent-signup.sh connect [--provider telegram] call connect_account; prints the link for the human
 #   agent-signup.sh call TOOL [JSON_ARGUMENTS]    call any Social Connect MCP tool, print its result
-#   agent-signup.sh where                         where the token is stored (never the token itself)
-#   agent-signup.sh logout                        forget the stored token for this host
+#   agent-signup.sh where                         where the token and recovery code are stored (never
+#                                                  the values themselves)
+#   agent-signup.sh logout                        forget the stored token for this host (keeps the
+#                                                  recovery code)
 #   agent-signup.sh host [URL | --reset]          show, save or forget this machine's Social Connect host
 #
 # Needs only sh, curl and openssl. Secrets (the emailed code, the PKCE verifier, access and refresh
-# tokens) are sent on stdin, never on a command line, and are never printed. Tokens go to the OS
-# keychain (macOS Keychain, or libsecret's secret-tool on Linux); without one they go to a mode-600
-# file under <config>/social-connect and the script says so. Settings:
+# tokens, the account's recovery code) are sent on stdin, never on a command line, and are never
+# printed. Tokens and the recovery code go to the OS keychain (macOS Keychain, or libsecret's
+# secret-tool on Linux); without one they go to mode-600 files under <config>/social-connect and
+# the script says so. The recovery code is returned once, the first time the account's encryption
+# key is created; every later authorize for that account sends it automatically. logout keeps it.
+# Settings:
 #   SOCIAL_CONNECT_WEB           the Social Connect host for this run; else the host saved with
 #                                 `host URL` (<config>/social-connect/host); else the default below
 #   SOCIAL_CONNECT_TOKEN_STORE   keychain | file (default: keychain when one works, else file)
+#   SOCIAL_CONNECT_RECOVERY_CODE the account's recovery code, when it was saved somewhere else
+#                                 (used instead of the stored one; never put it on a command line)
 set -u
 umask 077
 
@@ -31,8 +38,10 @@ CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/social-connect
 HOST_FILE=$CONFIG_DIR/host
 REDIRECT_URI=http://127.0.0.1:8976/callback
 KEYCHAIN_SERVICE=social-connect
+RECOVERY_SERVICE=social-connect-recovery
 SOCIAL_CONNECT_WEB=${SOCIAL_CONNECT_WEB:-}
 SOCIAL_CONNECT_TOKEN_STORE=${SOCIAL_CONNECT_TOKEN_STORE:-}
+SOCIAL_CONNECT_RECOVERY_CODE=${SOCIAL_CONNECT_RECOVERY_CODE:-}
 
 say() { printf '%s\n' "$*"; }
 warn() { printf 'social-connect: %s\n' "$*" >&2; }
@@ -51,6 +60,7 @@ MCP_URL=$WEB/mcp
 HOST_KEY=$(printf '%s' "${WEB#*://}" | tr -c 'A-Za-z0-9.-' '_')
 PENDING_FILE=$CONFIG_DIR/pending-$HOST_KEY
 TOKEN_FILE=$CONFIG_DIR/token-$HOST_KEY
+ACCOUNT_FILE=$CONFIG_DIR/account-$HOST_KEY
 
 for tool in curl openssl; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool is required"
@@ -115,43 +125,65 @@ store_kind() {
   fi
 }
 
-# Saves "ACCESS REFRESH CLIENT_ID" (read from stdin). Prints where it went.
-save_tokens() {
+# Generic secret store. SERVICE and ACCOUNT name the keychain item; FILE is the mode-600 fallback.
+# secret_save reads the value on stdin and prints where it went.
+secret_save() { # SERVICE ACCOUNT FILE LABEL
   value=$(cat)
-  kind=$(store_kind)
-  case $kind in
+  case $(store_kind) in
     macos-keychain)
-      if printf 'add-generic-password -U -s "%s" -a "%s" -l "Social Connect (%s)" -w "%s"\n' \
-          "$KEYCHAIN_SERVICE" "$HOST_KEY" "$HOST_KEY" "$value" | security -i >/dev/null 2>&1 &&
-        security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$HOST_KEY" >/dev/null 2>&1; then
-        rm -f "$TOKEN_FILE"
-        say "macOS Keychain (service $KEYCHAIN_SERVICE, account $HOST_KEY)"
+      if printf 'add-generic-password -U -s "%s" -a "%s" -l "%s" -w "%s"\n' "$1" "$2" "$4" "$value" |
+          security -i >/dev/null 2>&1 &&
+        security find-generic-password -s "$1" -a "$2" >/dev/null 2>&1; then
+        rm -f "$3"
+        say "macOS Keychain (service $1, account $2)"
         return
       fi ;;
     secret-tool)
-      if printf '%s' "$value" | secret-tool store --label="Social Connect ($HOST_KEY)" \
-          service "$KEYCHAIN_SERVICE" account "$HOST_KEY" >/dev/null 2>&1; then
-        rm -f "$TOKEN_FILE"
-        say "the Secret Service keyring (service $KEYCHAIN_SERVICE, account $HOST_KEY)"
+      if printf '%s' "$value" | secret-tool store --label="$4" service "$1" account "$2" >/dev/null 2>&1; then
+        rm -f "$3"
+        say "the Secret Service keyring (service $1, account $2)"
         return
       fi ;;
   esac
   mkdir -p "$CONFIG_DIR" && chmod 700 "$CONFIG_DIR"
-  { printf '%s\n' "$value" >"$TOKEN_FILE" && chmod 600 "$TOKEN_FILE"; } || die "cannot write $TOKEN_FILE"
-  if [ "$SOCIAL_CONNECT_TOKEN_STORE" = file ]; then say "$TOKEN_FILE (mode 600)"
-  else say "$TOKEN_FILE (mode 600; no OS keychain was usable)"
+  { printf '%s\n' "$value" >"$3" && chmod 600 "$3"; } || die "cannot write $3"
+  if [ "$SOCIAL_CONNECT_TOKEN_STORE" = file ]; then say "$3 (mode 600)"
+  else say "$3 (mode 600; no OS keychain was usable)"
   fi
 }
 
+secret_load() { # SERVICE ACCOUNT FILE  (prints the value for capture; callers never echo it)
+  if [ -f "$3" ]; then sed -n 1p "$3"; return; fi
+  case $(store_kind) in
+    macos-keychain) security find-generic-password -s "$1" -a "$2" -w 2>/dev/null ;;
+    secret-tool) secret-tool lookup service "$1" account "$2" 2>/dev/null ;;
+  esac
+  return 0
+}
+
+secret_exists() { # SERVICE ACCOUNT FILE
+  [ -f "$3" ] && return 0
+  case $(store_kind) in
+    macos-keychain) security find-generic-password -s "$1" -a "$2" >/dev/null 2>&1 ;;
+    secret-tool) secret-tool lookup service "$1" account "$2" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
+secret_forget() { # SERVICE ACCOUNT FILE
+  rm -f "$3"
+  case $(store_kind) in
+    macos-keychain) security delete-generic-password -s "$1" -a "$2" >/dev/null 2>&1 ;;
+    secret-tool) secret-tool clear service "$1" account "$2" >/dev/null 2>&1 ;;
+  esac
+  return 0
+}
+
+# Tokens: "ACCESS REFRESH CLIENT_ID", one item per host.
+save_tokens() { secret_save "$KEYCHAIN_SERVICE" "$HOST_KEY" "$TOKEN_FILE" "Social Connect ($HOST_KEY)"; }
+forget_tokens() { secret_forget "$KEYCHAIN_SERVICE" "$HOST_KEY" "$TOKEN_FILE"; }
 load_tokens() {
-  value=
-  if [ -f "$TOKEN_FILE" ]; then value=$(sed -n 1p "$TOKEN_FILE")
-  else
-    case $(store_kind) in
-      macos-keychain) value=$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$HOST_KEY" -w 2>/dev/null) ;;
-      secret-tool) value=$(secret-tool lookup service "$KEYCHAIN_SERVICE" account "$HOST_KEY" 2>/dev/null) ;;
-    esac
-  fi
+  value=$(secret_load "$KEYCHAIN_SERVICE" "$HOST_KEY" "$TOKEN_FILE")
   [ -n "$value" ] || die "not signed in to $WEB: run signup, then authorize (or set SOCIAL_CONNECT_WEB)"
   # shellcheck disable=SC2086
   set -- $value
@@ -159,13 +191,11 @@ load_tokens() {
   [ -n "$ACCESS" ] || die "the stored token for $WEB is unreadable: run logout, then signup again"
 }
 
-forget_tokens() {
-  rm -f "$TOKEN_FILE"
-  case $(store_kind) in
-    macos-keychain) security delete-generic-password -s "$KEYCHAIN_SERVICE" -a "$HOST_KEY" >/dev/null 2>&1 ;;
-    secret-tool) secret-tool clear service "$KEYCHAIN_SERVICE" account "$HOST_KEY" >/dev/null 2>&1 ;;
-  esac
-  return 0
+# Recovery code: one item per host and account email. Shown once by the server at first sign-up and
+# required to authorize that account again; it is never printed and logout keeps it.
+recovery_names() { # EMAIL -> sets RC_ACCOUNT and RC_FILE
+  RC_ACCOUNT="$HOST_KEY/$1"
+  RC_FILE=$CONFIG_DIR/recovery-$HOST_KEY-$(printf '%s' "$1" | tr -c 'A-Za-z0-9.-' '_')
 }
 
 # --- commands ---------------------------------------------------------------------------------
@@ -250,13 +280,36 @@ cmd_authorize() {
   email=$(pending email) agent_name=$(pending agent_name) client_id=$(pending client_id)
   verifier=$(pending verifier) state=$(pending state) authorize_url=$(pending authorize_url)
 
-  answer=$(printf '{"email":"%s","code":"%s","authorize_url":"%s","agent_name":"%s"}' \
-    "$email" "$code" "$authorize_url" "$agent_name" | post_stdin "$WEB/api/agent/authorize" application/json)
+  recovery_names "$email"
+  recovery=$SOCIAL_CONNECT_RECOVERY_CODE recovery_source=SOCIAL_CONNECT_RECOVERY_CODE
+  if [ -z "$recovery" ]; then
+    recovery=$(secret_load "$RECOVERY_SERVICE" "$RC_ACCOUNT" "$RC_FILE") recovery_source=stored
+  fi
+  json_safe "$recovery" || die "authorize: the recovery code must not contain quotes or backslashes"
+
+  answer=$({
+    printf '{"email":"%s","code":"%s","authorize_url":"%s","agent_name":"%s"' "$email" "$code" "$authorize_url" "$agent_name"
+    [ -n "$recovery" ] && printf ',"recovery_code":"%s"' "$recovery"
+    printf '}'
+  } | post_stdin "$WEB/api/agent/authorize" application/json)
   case $(status_code) in
     200) ;;
     400) explain_error "$answer" "authorize (a wrong or expired code: run signup again for a new one)" ;;
+    403)
+      if [ -z "$recovery" ]; then
+        die "authorize refused (recovery_code_required): $email already has an encryption key, created at its first sign-up, and this machine has no recovery code for it. The emailed code is now used up. If the recovery code was saved elsewhere, run signup again and authorize with SOCIAL_CONNECT_RECOVERY_CODE set in the environment (never on a command line). Without it this account cannot be authorized again; sign up with another address."
+      fi
+      die "authorize refused (recovery_code_required): the recovery code ($recovery_source) was not accepted for $email. The emailed code is now used up. Run signup again and authorize with the right code in SOCIAL_CONNECT_RECOVERY_CODE." ;;
     *) explain_error "$answer" "authorize" ;;
   esac
+  # Shown once, the first time the account's key is created: store it before anything else.
+  new_recovery=$(json_field "$answer" recovery_code)
+  recovery_where=''
+  if [ -n "$new_recovery" ]; then
+    recovery_where=$(printf '%s' "$new_recovery" | secret_save "$RECOVERY_SERVICE" "$RC_ACCOUNT" "$RC_FILE" "Social Connect recovery code ($RC_ACCOUNT)")
+  elif [ -n "$SOCIAL_CONNECT_RECOVERY_CODE" ]; then
+    recovery_where=$(printf '%s' "$SOCIAL_CONNECT_RECOVERY_CODE" | secret_save "$RECOVERY_SERVICE" "$RC_ACCOUNT" "$RC_FILE" "Social Connect recovery code ($RC_ACCOUNT)")
+  fi
   redirect_to=$(json_field "$answer" redirect_to)
   [ "$(query_param "$redirect_to" state)" = "$state" ] || die "authorize: the answer's state does not match this sign-up"
   grant=$(query_param "$redirect_to" code)
@@ -271,9 +324,15 @@ cmd_authorize() {
   [ -n "$access" ] || die "token exchange returned no access_token"
   where=$(printf '%s %s %s' "$access" "${refresh:--}" "$client_id" | save_tokens)
   rm -f "$PENDING_FILE"
+  printf '%s\n' "$email" >"$ACCOUNT_FILE"
 
   say "signed_in: $email on $WEB"
   say "token: stored in $where"
+  if [ -n "$new_recovery" ]; then
+    say "recovery_code: stored in $recovery_where (the server shows it only once; it is required to authorize this account again, so keep it and back it up; it is never printed)"
+  elif [ -n "$recovery_where" ]; then
+    say "recovery_code: stored in $recovery_where"
+  fi
   say "next: agent-signup.sh connect   (gives you the link your human opens to connect Telegram)"
 }
 
@@ -282,7 +341,10 @@ refresh_tokens() {
   tokens=$(printf 'grant_type=refresh_token&refresh_token=%s&client_id=%s&resource=%s' \
     "$(form_escape "$REFRESH")" "$(form_escape "$CLIENT_ID")" "$(form_escape "$MCP_URL")" |
     post_stdin "$WEB/oauth/token" application/x-www-form-urlencoded)
-  [ "$(status_code)" = 200 ] || return 1
+  if [ "$(status_code)" != 200 ]; then
+    REFRESH_ERROR=$(json_field "$tokens" error_description)
+    return 1
+  fi
   new_access=$(json_field "$tokens" access_token)
   [ -n "$new_access" ] || return 1
   new_refresh=$(json_field "$tokens" refresh_token)
@@ -312,7 +374,13 @@ mcp_session() {
   init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"social-connect-agent-signup","version":"0.1.0"}}}'
   mcp_post "$init" >/dev/null
   if [ "$(status_code)" = 401 ]; then
-    refresh_tokens || die "the stored token for $WEB was refused and could not be refreshed: run signup and authorize again"
+    REFRESH_ERROR=''
+    if ! refresh_tokens; then
+      case $REFRESH_ERROR in
+        *'Encryption keys changed'*) die "Encryption keys changed; connect this assistant again: run signup and authorize again (the stored recovery code is sent automatically)" ;;
+      esac
+      die "the stored token for $WEB was refused and could not be refreshed${REFRESH_ERROR:+ ($REFRESH_ERROR)}: run signup and authorize again"
+    fi
     mcp_post "$init" >/dev/null
   fi
   [ "$(status_code)" = 200 ] || die "MCP initialize failed (HTTP $(status_code))"
@@ -361,16 +429,24 @@ cmd_connect() {
 }
 
 cmd_where() {
-  found=''
-  if [ -f "$TOKEN_FILE" ]; then say "token: $TOKEN_FILE"
+  if secret_exists "$KEYCHAIN_SERVICE" "$HOST_KEY" "$TOKEN_FILE"; then
+    if [ -f "$TOKEN_FILE" ]; then say "token: $TOKEN_FILE"
+    else say "token: $(store_kind) (service $KEYCHAIN_SERVICE, account $HOST_KEY)"
+    fi
   else
-    case $(store_kind) in
-      macos-keychain) security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$HOST_KEY" >/dev/null 2>&1 &&
-        found="macOS Keychain (service $KEYCHAIN_SERVICE, account $HOST_KEY)" ;;
-      secret-tool) secret-tool lookup service "$KEYCHAIN_SERVICE" account "$HOST_KEY" >/dev/null 2>&1 &&
-        found="Secret Service keyring (service $KEYCHAIN_SERVICE, account $HOST_KEY)" ;;
-    esac
-    say "token: ${found:-none stored for $WEB}"
+    say "token: none stored for $WEB"
+  fi
+  if [ -f "$ACCOUNT_FILE" ]; then
+    email=$(sed -n 1p "$ACCOUNT_FILE")
+    recovery_names "$email"
+    say "account: $email"
+    if secret_exists "$RECOVERY_SERVICE" "$RC_ACCOUNT" "$RC_FILE"; then
+      if [ -f "$RC_FILE" ]; then say "recovery_code: $RC_FILE"
+      else say "recovery_code: $(store_kind) (service $RECOVERY_SERVICE, account $RC_ACCOUNT)"
+      fi
+    else
+      say "recovery_code: none stored for $email"
+    fi
   fi
   [ -f "$PENDING_FILE" ] && say "pending_signup: $PENDING_FILE"
   return 0
@@ -420,7 +496,7 @@ case ${1:-} in
   connect) shift; cmd_connect "$@" ;;
   call) shift; cmd_call "$@" ;;
   where) shift; cmd_where ;;
-  logout) shift; forget_tokens; rm -f "$PENDING_FILE"; say "logged_out: $WEB" ;;
+  logout) shift; forget_tokens; rm -f "$PENDING_FILE"; say "logged_out: $WEB (the recovery code is kept)" ;;
   host) shift; cmd_host "$@" ;;
   *)
     cat >&2 <<'USAGE'

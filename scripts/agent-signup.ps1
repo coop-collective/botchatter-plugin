@@ -14,10 +14,13 @@ agent-signup.sh (which Git for Windows' bash and WSL also run):
 
 An autonomous agent with its own mailbox creates and owns a Social Connect account without a
 browser, then hands its human a link to connect Telegram. Secrets (the emailed code, the PKCE
-verifier, access and refresh tokens) are never printed. On Windows the tokens are kept in a file
-encrypted for the current Windows user (DPAPI) under %APPDATA%\social-connect; elsewhere in a
-mode-600 file, and the script says where. Settings: SOCIAL_CONNECT_WEB (else the host saved with
-`host URL`, else https://staging.cooposio.com), as for the sh script.
+verifier, access and refresh tokens, the account's recovery code) are never printed. On Windows
+they are kept in files encrypted for the current Windows user (DPAPI) under
+%APPDATA%\social-connect; elsewhere in mode-600 files, and the script says where. The recovery
+code is returned once, when the account's encryption key is created; later authorize runs for
+that account send it automatically, and logout keeps it. Settings: SOCIAL_CONNECT_WEB (else the
+host saved with `host URL`, else https://staging.cooposio.com) and SOCIAL_CONNECT_RECOVERY_CODE
+(a recovery code saved elsewhere), as for the sh script.
 #>
 param(
   [Parameter(Position = 0)][string]$Command = '',
@@ -54,6 +57,7 @@ function Set-Host([string]$Url) {
   $script:HostKey = ($script:Web -replace '^[a-z]+://', '') -replace '[^A-Za-z0-9.-]', '_'
   $script:PendingFile = Join-Path $ConfigDir "pending-$($script:HostKey)"
   $script:TokenFile = Join-Path $ConfigDir "token-$($script:HostKey)"
+  $script:AccountFile = Join-Path $ConfigDir "account-$($script:HostKey)"
 }
 Set-Host $Web
 
@@ -107,27 +111,32 @@ function Write-Private([string]$Path, [string]$Text) {
 
 # --- token storage ----------------------------------------------------------------------------
 
-function Save-Tokens([string]$Access, [string]$Refresh, [string]$ClientId) {
-  $value = "$Access $Refresh $ClientId"
+function Save-Secret([string]$Path, [string]$Value) {
   if ($IsWin) {
-    $secure = ConvertTo-SecureString $value -AsPlainText -Force
-    Write-Private $TokenFile (ConvertFrom-SecureString $secure)
-    return "$TokenFile (encrypted for this Windows user with DPAPI)"
+    $secure = ConvertTo-SecureString $Value -AsPlainText -Force
+    Write-Private $Path (ConvertFrom-SecureString $secure)
+    return "$Path (encrypted for this Windows user with DPAPI)"
   }
-  Write-Private $TokenFile $value
-  return "$TokenFile (mode 600; on macOS and Linux agent-signup.sh uses the OS keychain)"
+  Write-Private $Path $Value
+  return "$Path (mode 600; on macOS and Linux agent-signup.sh uses the OS keychain)"
 }
+
+function Load-Secret([string]$Path) {
+  if (-not (Test-Path $Path)) { return '' }
+  $raw = ([string](Get-Content $Path -TotalCount 1)).Trim()
+  if ($IsWin) {
+    try { $raw = [System.Net.NetworkCredential]::new('', (ConvertTo-SecureString $raw)).Password } catch { return '' }
+  }
+  return $raw
+}
+
+function Recovery-File([string]$Address) { Join-Path $ConfigDir ("recovery-$HostKey-" + ($Address -replace '[^A-Za-z0-9.-]', '_')) }
+
+function Save-Tokens([string]$Access, [string]$Refresh, [string]$ClientId) { Save-Secret $TokenFile "$Access $Refresh $ClientId" }
 
 function Load-Tokens {
   if (-not (Test-Path $TokenFile)) { Fail "not signed in to ${Web}: run signup, then authorize (or set SOCIAL_CONNECT_WEB)" }
-  $raw = ([string](Get-Content $TokenFile -TotalCount 1)).Trim()
-  if ($IsWin) {
-    try {
-      $secure = ConvertTo-SecureString $raw
-      $raw = [System.Net.NetworkCredential]::new('', $secure).Password
-    } catch { Fail "the stored token for $Web is unreadable: run logout, then signup again" }
-  }
-  $parts = $raw -split ' '
+  $parts = (Load-Secret $TokenFile) -split ' '
   if (-not $parts[0]) { Fail "the stored token for $Web is unreadable: run logout, then signup again" }
   $script:Access = $parts[0]; $script:Refresh = $parts[1]; $script:ClientId = $parts[2]
 }
@@ -190,9 +199,25 @@ function Cmd-Authorize {
   if (-not (Test-Path $PendingFile)) { Fail "no sign-up in progress for ${Web}: run signup EMAIL first" }
   $p = Get-Content $PendingFile -Raw | ConvertFrom-Json
 
-  $answer = Send 'POST' "$Web/api/agent/authorize" (@{ email = $p.email; code = $c; authorize_url = $p.authorize_url; agent_name = $p.agent_name } | ConvertTo-Json -Compress)
+  $rcFile = Recovery-File $p.email
+  $recovery = $env:SOCIAL_CONNECT_RECOVERY_CODE; $recoverySource = 'SOCIAL_CONNECT_RECOVERY_CODE'
+  if (-not $recovery) { $recovery = Load-Secret $rcFile; $recoverySource = 'stored' }
+  $body = @{ email = $p.email; code = $c; authorize_url = $p.authorize_url; agent_name = $p.agent_name }
+  if ($recovery) { $body.recovery_code = $recovery }
+  $answer = Send 'POST' "$Web/api/agent/authorize" ($body | ConvertTo-Json -Compress)
   if ($answer.Status -eq 400) { Explain $answer 'authorize (a wrong or expired code: run signup again for a new one)' }
+  if ($answer.Status -eq 403) {
+    if (-not $recovery) {
+      Fail "authorize refused (recovery_code_required): $($p.email) already has an encryption key, created at its first sign-up, and this machine has no recovery code for it. The emailed code is now used up. If the recovery code was saved elsewhere, run signup again and authorize with SOCIAL_CONNECT_RECOVERY_CODE set in the environment (never on a command line). Without it this account cannot be authorized again; sign up with another address."
+    }
+    Fail "authorize refused (recovery_code_required): the recovery code ($recoverySource) was not accepted for $($p.email). The emailed code is now used up. Run signup again and authorize with the right code in SOCIAL_CONNECT_RECOVERY_CODE."
+  }
   if ($answer.Status -ne 200) { Explain $answer 'authorize' }
+  # Shown once, the first time the account's key is created: store it before anything else.
+  $newRecovery = (Parse $answer.Body).recovery_code
+  $recoveryWhere = ''
+  if ($newRecovery) { $recoveryWhere = Save-Secret $rcFile $newRecovery }
+  elseif ($env:SOCIAL_CONNECT_RECOVERY_CODE) { $recoveryWhere = Save-Secret $rcFile $env:SOCIAL_CONNECT_RECOVERY_CODE }
   $redirectTo = (Parse $answer.Body).redirect_to
   if ((Query-Param $redirectTo 'state') -ne $p.state) { Fail "authorize: the answer's state does not match this sign-up" }
   $grant = Query-Param $redirectTo 'code'
@@ -205,15 +230,19 @@ function Cmd-Authorize {
   $refresh = if ($t.refresh_token) { $t.refresh_token } else { '-' }
   $where = Save-Tokens $t.access_token $refresh $p.client_id
   Remove-Item -Force $PendingFile
+  Ensure-ConfigDir
+  Set-Content -Path $AccountFile -Value $p.email
   Say "signed_in: $($p.email) on $Web"
   Say "token: stored in $where"
+  if ($newRecovery) { Say "recovery_code: stored in $recoveryWhere (the server shows it only once; it is required to authorize this account again, so keep it and back it up; it is never printed)" }
+  elseif ($recoveryWhere) { Say "recovery_code: stored in $recoveryWhere" }
   Say 'next: agent-signup.ps1 connect   (gives you the link your human opens to connect Telegram)'
 }
 
 function Refresh-Tokens {
   if (-not $script:Refresh -or $script:Refresh -eq '-') { return $false }
   $res = Send 'POST' "$Web/oauth/token" (Form @{ grant_type = 'refresh_token'; refresh_token = $script:Refresh; client_id = $script:ClientId; resource = $McpUrl }) 'application/x-www-form-urlencoded'
-  if ($res.Status -ne 200) { return $false }
+  if ($res.Status -ne 200) { $script:RefreshError = [string](Parse $res.Body).error_description; return $false }
   $t = Parse $res.Body
   if (-not $t.access_token) { return $false }
   $script:Access = $t.access_token
@@ -236,7 +265,11 @@ function Invoke-Tool([string]$Name, [string]$ArgsJson) {
   $init = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"social-connect-agent-signup","version":"0.1.0"}}}'
   $res = Mcp $init
   if ($res.Status -eq 401) {
-    if (-not (Refresh-Tokens)) { Fail "the stored token for $Web was refused and could not be refreshed: run signup and authorize again" }
+    $script:RefreshError = ''
+    if (-not (Refresh-Tokens)) {
+      if ($script:RefreshError -like '*Encryption keys changed*') { Fail 'Encryption keys changed; connect this assistant again: run signup and authorize again (the stored recovery code is sent automatically)' }
+      Fail "the stored token for $Web was refused and could not be refreshed$(if ($script:RefreshError) { " ($($script:RefreshError))" }): run signup and authorize again"
+    }
     $res = Mcp $init
   }
   if ($res.Status -ne 200) { Fail "MCP initialize failed (HTTP $($res.Status))" }
@@ -304,11 +337,17 @@ switch ($Command) {
   'call' { Cmd-Call $Arg1 $Arg2 }
   'where' {
     if (Test-Path $TokenFile) { Say "token: $TokenFile" } else { Say "token: none stored for $Web" }
+    if (Test-Path $AccountFile) {
+      $acct = ([string](Get-Content $AccountFile -TotalCount 1)).Trim()
+      $rcFile = Recovery-File $acct
+      Say "account: $acct"
+      if (Test-Path $rcFile) { Say "recovery_code: $rcFile" } else { Say "recovery_code: none stored for $acct" }
+    }
     if (Test-Path $PendingFile) { Say "pending_signup: $PendingFile" }
   }
   'logout' {
     Remove-Item -Force -ErrorAction SilentlyContinue $TokenFile, $PendingFile
-    Say "logged_out: $Web"
+    Say "logged_out: $Web (the recovery code is kept)"
   }
   'host' { Cmd-Host $Arg1 }
   default {

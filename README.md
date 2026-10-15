@@ -4,7 +4,9 @@ Social Connect lets your AI assistant read your own Telegram chats (personal Wha
 and propose replies that you approve yourself. It is a hosted remote MCP server: you sign in with
 an email code, connect Telegram by scanning a QR code, and then ask your assistant to catch you
 up, summarize a chat or draft a reply. Nothing is ever sent unless you approve it in the Social
-Connect web app, and reads never mark your messages as read.
+Connect web app, and reads never mark your messages as read. For Telegram, your messages,
+contacts and connection credentials are encrypted with a key that only you, and the AI apps you
+connect, can unlock; we don't keep that key. Personal WhatsApp is coming soon.
 
 This plugin connects Claude Code or Codex to that server and teaches the agent how to use it:
 when to read (only when you ask), how much (bounded reads), how to summarize, how to propose a
@@ -42,17 +44,20 @@ codex mcp login social-connect                          # Codex keeps the creden
 ```
 
 A browser tab opens: enter your email and the 6-digit code it sends you, then approve the
-assistant. If no Telegram account is connected yet, the button reads **Allow and connect
+assistant. The first time, it shows a recovery code once: save it in a password manager (it
+unlocks your data in a new browser). If no Telegram account is connected yet, the button reads **Allow and connect
 Telegram**: read the disclosure, then scan the QR code with Telegram on your phone
 (**Settings → Devices → Link Desktop Device**), or tap the `tg://` link if you are on the phone.
 The browser then returns you to your assistant. Skipped it? Run `/social-connect:connect`.
+A connect link is valid for 30 minutes and also unlocks your encrypted data for 2 hours, so
+keep it to yourself.
 
 ## What it adds
 
 | Piece | What it does |
 |---|---|
 | Skill `social-connect` | Loaded when you ask about your Telegram messages, connecting an account, or Social Connect: the tools, the sign-in and connect flow, agent sign-up, and etiquette (ask first, at most 20 chats and 30 messages per call, summarize rather than dump, never pressure you to approve, give the connect link when not connected, wait out rate limits). |
-| `/social-connect:connect [telegram]` | Gets a 30-minute connect link from the MCP server and shows it, with the QR steps. |
+| `/social-connect:connect [telegram]` | Gets a 30-minute connect link from the MCP server and shows it to you only, with the QR steps. |
 | `/social-connect:host <url>` | Uses a custom host (self-hosted, local or staging) for the MCP server and agent sign-up, saved across sessions; `--reset` goes back to the default. |
 | `.mcp.json` | The `social-connect` MCP server (HTTP, OAuth) at the plugin's `mcp_url` option (default `https://staging.cooposio.com/mcp`). Codex reads `.codex-plugin/plugin.json` and the literal `.codex-mcp.json` instead. |
 | `scripts/agent-signup.sh`, `.ps1` | Headless sign-up for an autonomous agent with its own mailbox (below). |
@@ -63,7 +68,7 @@ The browser then returns you to your assistant. Skipped it? Run `/social-connect
 | Tool | What it does |
 |---|---|
 | `connection_status` | Which accounts are connected |
-| `connect_account({provider})` | A 30-minute link for you to open and scan the QR code |
+| `connect_account({provider})` | A 30-minute link (with a 2-hour device unlock) for you to open and scan the QR code |
 | `list_recent_chats({limit ≤ 20})` | Your most recent chats, newest first |
 | `read_recent_messages({chat_ref, limit ≤ 30})` | Recent text messages in one chat; never marks them read |
 | `request_reply_approval({chat_ref, text})` | A pending reply you review, edit, approve or reject in the web app. Sending is disabled on staging |
@@ -86,8 +91,13 @@ authorize URL (scope `telegram`), trades the emailed code through `POST /api/age
 exchanges the authorization code at `/oauth/token`, and refreshes the token when it expires.
 Secrets travel on stdin, never on a command line, and are never printed. Tokens go to the macOS
 Keychain or the Linux Secret Service (`secret-tool`), else to a mode-600 file it names
-(`SOCIAL_CONNECT_TOKEN_STORE=file` forces that). `scripts/agent-signup.ps1` is the PowerShell
-twin; on Windows it keeps the token in a file encrypted for the current user (DPAPI). The raw
+(`SOCIAL_CONNECT_TOKEN_STORE=file` forces that). The first `authorize` also receives the
+account's **recovery code**, shown once by the server: the script stores it the same way, never
+prints it, and sends it on every later `authorize` for that address (without it the server
+answers 403 `recovery_code_required`). `logout` keeps it; `where` shows where both are stored.
+A recovery code saved elsewhere goes in `SOCIAL_CONNECT_RECOVERY_CODE`. `scripts/agent-signup.ps1` is the PowerShell
+twin; on Windows it keeps the token and recovery code in files encrypted for the current user
+(DPAPI). The raw
 HTTP steps are in
 [skills/social-connect/references/agent-signup.md](skills/social-connect/references/agent-signup.md).
 
@@ -137,9 +147,10 @@ sh test/script-tests.sh        # manifests agree, shellcheck, offline checks of 
 
 | Feature | State |
 |---|---|
-| MCP OAuth (email code sign-in, DCR and CIMD), the five tools | Staging (`https://staging.cooposio.com`) |
+| MCP OAuth (email code sign-in, DCR and CIMD), the five tools, 30 tool calls a minute per account | Staging (`https://staging.cooposio.com`) |
+| User-keyed encryption at rest for Telegram (recovery code, device unlock) | Built (connector HEAD); check staging is deployed |
 | Connect Telegram by QR inside the OAuth trip | Staging |
-| Agent sign-up (`/api/agent/*`) | Built; check `GET <host>/api/agent/` answers JSON before relying on it |
+| Agent sign-up (`/api/agent/*`, with the recovery code) | Built; check `GET <host>/api/agent/` answers JSON before relying on it |
 | Sending an approved reply | **Disabled** on staging (approval is recorded, nothing is sent) |
 | Personal WhatsApp | **Coming** |
 

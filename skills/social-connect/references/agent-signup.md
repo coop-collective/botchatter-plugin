@@ -53,11 +53,20 @@ never contacted.
 POST <web>/api/agent/authorize
 Content-Type: application/json
 
-{"email":"agent@example.org","code":"123456","authorize_url":"<the URL from step 2>"}
+{"email":"agent@example.org","code":"123456","authorize_url":"<the URL from step 2>",
+ "recovery_code":"<only when you have one>"}
 ```
 
 `200 {"redirect_to":"http://127.0.0.1:8976/callback?code=…&state=…"}`. Check that `state`
 matches. `400 invalid_grant`: wrong or expired code (start again at step 1).
+
+The **first** time, the account's encryption key is created and the answer also carries
+`recovery_code` and `recovery_code_note` ("Shown once. Store it; it is required to authorize
+again."). Store it in a secret store at once, before anything else; never print or log it.
+Every later authorize for that account (a new client, or after the key changed) must send it,
+or gets `403 {"error":"recovery_code_required"}`; the emailed code is used up by then, so start
+again at step 1 with the recovery code ready. A lost recovery code means the account cannot be
+authorized again.
 
 ## 4. Exchange it for tokens
 
@@ -71,14 +80,18 @@ grant_type=authorization_code&code=<code>&redirect_uri=<redirect>&client_id=<id>
 
 `access_token` (Bearer, bound to `<web>/mcp`) and `refresh_token`. Refresh with
 `grant_type=refresh_token&refresh_token=…&client_id=…&resource=…`; the refresh token rotates, so
-store the new one. Keep both in a secret store; never print or log them.
+store the new one. Keep both in a secret store; never print or log them. A refresh that fails
+with `invalid_grant` "Encryption keys changed; connect this assistant again." means the grant was
+revoked after a key reset: go back to step 1 (with the recovery code).
 
 ## 5. Use the MCP server and connect Telegram
 
 Streamable HTTP at `<web>/mcp` with `Authorization: Bearer <access_token>` and
 `Accept: application/json, text/event-stream`: `initialize`, `notifications/initialized`, then
-`tools/call`. Call `connect_account({"provider":"telegram"})` and give `connect_url` (valid 30
-minutes) to your human only: they open it and scan the QR code with Telegram (Settings → Devices
+`tools/call` (at most 30 tool calls a minute per account). Call
+`connect_account({"provider":"telegram"})` and give `connect_url` (valid 30 minutes, and it
+carries a 2-hour device unlock, so it is a secret) to your own human only, privately, never
+anywhere public: they open it and scan the QR code with Telegram (Settings → Devices
 → Link Desktop Device, or tap the `tg://` link on the phone). When they say it is done,
 `connection_status` shows `connected` and the read tools work. The etiquette in `SKILL.md`
 applies to an agent exactly as to an assistant: the chats are the human's.

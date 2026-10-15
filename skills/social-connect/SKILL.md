@@ -31,12 +31,16 @@ invent or edit one. Full schemas and error texts: [references/mcp-tools.md](refe
    `claude mcp login plugin:social-connect:social-connect` (or `/mcp` inside a session, then pick
    `plugin:social-connect:social-connect`); in Codex, `codex mcp login social-connect`. A browser
    opens: they enter their email, type the 6-digit code from the email, and approve the assistant.
+   The first time, the page shows a **recovery code once**: tell them to save it somewhere safe
+   (a password manager). It unlocks their encrypted data in a new browser; without it, a lost
+   browser means connecting again from scratch. Never ask them to paste it into the chat.
 2. **Connect Telegram in the same trip.** If no Telegram account is connected yet, the consent
    button reads "Allow and connect Telegram". They read the disclosure, then scan the QR code
    with Telegram on their phone (**Settings → Devices → Link Desktop Device**), or, on the phone
    itself, tap the `tg://` link. The browser then returns them to the assistant.
 3. **Later, or if it was skipped:** `/social-connect:connect`, or call `connect_account` and show
-   the `connect_url` (valid 30 minutes). Wait until they say it is done, then `connection_status`.
+   the `connect_url` (valid 30 minutes) to that person only. Wait until they say it is done, then
+   `connection_status`. The link is sensitive (see "Connect links" below).
 
 ## (b) An autonomous agent signing itself up (headless)
 
@@ -55,7 +59,7 @@ S=../../scripts/agent-signup.sh             # relative to this skill directory
 sh $S describe                               # optional: the host's own description of the steps
 sh $S signup agent@example.org --agent-name "Example Agent"   # registers a client, prepares PKCE, emails a code
 # read the 6-digit code from the agent's mailbox (subject "<code> is your Social Connect code")
-printf '%s\n' "$CODE" | sh $S authorize --code -   # trades it for tokens; prints only where they are stored
+printf '%s\n' "$CODE" | sh $S authorize --code -   # trades it for tokens; stores them and the recovery code
 sh $S connect                                 # prints connect_url: give it to your human
 sh $S status                                  # after they say it is done
 sh $S call list_recent_chats '{"limit":10}'   # any tool; exit 3 when the tool reports an error
@@ -67,11 +71,27 @@ agent_name}` → register a client at `/oauth/register` → PKCE S256 `/authoriz
 `telegram` → `POST /api/agent/authorize {email, code, authorize_url}` → `redirect_to` carries the
 code → exchange at `/oauth/token` → call `/mcp` → `connect_account` → link to the human.
 
+**Recovery code.** The first successful `authorize` for an account creates its encryption key and
+returns a `recovery_code` once. The script stores it like the token (Keychain / `secret-tool` /
+mode-600 file), never prints it, sends it automatically on every later `authorize` for that
+address (a new client, a new machine after copying it, or after the key changed), and `logout`
+keeps it. Without it, a later `authorize` gets **403 `recovery_code_required`** and the emailed
+code is used up: if the code was saved elsewhere, run `signup` again and `authorize` with
+`SOCIAL_CONNECT_RECOVERY_CODE` set in the environment (never on a command line); if it is lost,
+that account cannot be authorized again, so sign up with another address. `sh $S where` shows
+where the token and recovery code are stored without printing them.
+
 Rules: only for an address the agent itself controls; an address that belongs to a
-browser-created account answers 409 (that person signs in through (a)). Give the connect link to
-the agent's own human only, never post it anywhere public: it lets whoever opens it connect a
-Telegram account to this Social Connect account for 30 minutes. Never print, log or paste the
-access token, refresh token or emailed code.
+browser-created account answers 409 (that person signs in through (a)). Never print, log or
+paste the access token, refresh token, recovery code or emailed code.
+
+## Connect links are sensitive
+
+A `connect_url` (`/link/cl2.…`) is valid for 30 minutes and carries a **2-hour device unlock**
+for the account's encrypted data. Give it only to the account's own human, in this private
+conversation (or the agent's private channel to its owner). Never post it publicly, in a group
+chat, an issue, a commit, a log or a file, and never send it to anyone else. Do not open it
+yourself. If it may have leaked, say so and get a fresh one later rather than reusing it.
 
 ## (c) Etiquette: reading someone's private messages
 
@@ -91,21 +111,33 @@ access token, refresh token or emailed code.
   pressure, nag or hurry the person to approve; one mention is enough, and rejecting is fine.
   One reply per request: no bulk replies, no messages to chats the user did not choose.
 - **Not connected.** A tool error "Telegram is not connected. Ask the user to open <url> …"
-  already contains the link: show it, explain the QR step (Settings → Devices → Link Desktop
+  already contains a connect link (sensitive, as above): show it to the user only, explain the QR step (Settings → Devices → Link Desktop
   Device, or tap the `tg://` link on the phone), wait until they say it is done, then
   `connection_status` and retry once. `state: revoked` means Telegram ended the session (for
   example, the device was removed): call `connect_account` for a fresh link.
-- **Rate limits and flood waits.** "Telegram is rate-limiting this account. Try again in N
+- **Rate limits and flood waits.** "Rate limit: at most 30 Social Connect calls per minute"
+  (per account), "Telegram is rate-limiting this account. Try again in N
   seconds/minutes/hours", or a sign-in 429 ("wait 30 seconds", "Wait a minute"): stop calling,
-  tell the user, and retry once after the stated time. Never retry in a tight loop, and do not
+  tell the user, and retry once after the stated time (a minute for the 30-calls limit). Plan
+  reads so one request stays well under 30 calls. Never retry in a tight loop, and do not
   wait silently for longer than a minute or two: say how long and continue with other work or end
   the turn. A wait of an hour or more: report it and stop.
 - **401 / unauthorized.** The sign-in expired or was revoked: ask the person to sign in again
   (`/mcp`); an agent re-runs `signup` and `authorize`.
+- **"Encryption keys changed; connect this assistant again"** (an `invalid_grant` when the token
+  is refreshed, after the account's key was reset): the grant is revoked. A person signs in again
+  with `/mcp`; an agent runs `signup` and `authorize` again (the stored recovery code is sent).
 
-## What not to say
+## What to say about privacy
 
 Social Connect never sends without the owner's approval in the web app, and reads do not mark
-messages as read. Do not describe it as "end-to-end encrypted" or "zero-knowledge", and do not
-claim the service "can never see" messages: it processes them on its servers to answer your
-tool calls. For privacy questions, point to the Social Connect web app's own pages.
+messages as read. For **Telegram** you may say, in these words: "Your messages, contacts and
+connection credentials are encrypted with a key that only you, and the AI apps you connect, can
+unlock. We don't keep that key." Also: "When you disconnect, we delete the key, and anything left
+behind is permanently unreadable", and "To work, our servers process your messages in memory
+while your assistant is using them. We don't store them in a form we can read." Personal
+WhatsApp is coming soon; make no claims about it yet.
+
+Never say "end-to-end encrypted" or "zero-knowledge" (or "zero-access"), "we can never see your
+messages", "only you can unlock" (without "and the AI apps you connect"), "even if we're hacked
+your data is safe", or that Cloudflare cannot access it.

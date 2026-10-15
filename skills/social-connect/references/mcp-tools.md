@@ -22,8 +22,11 @@ readable message.
 { "provider": "telegram", "connect_url": "https://…/link/…", "expires_in_seconds": 1800 }
 ```
 
-A signed 30-minute link for the human. Opening it gives a connect-only session: it can connect,
-view or disconnect the provider account, but cannot approve replies or authorize assistants.
+A signed 30-minute link (`/link/cl2.…`) for the account's own human only. It also carries a
+2-hour device unlock for the account's encrypted data, so treat it as a secret: never post it
+publicly or anywhere but the private conversation with that person. Opening it gives a
+connect-only session: it can connect, view or disconnect the provider account, but cannot
+approve replies or authorize assistants.
 The page shows a QR code; the human scans it in Telegram under Settings → Devices → Link Desktop
 Device, or taps the `tg://` link on the phone that has Telegram. `whatsapp` currently errors with
 "WhatsApp is coming soon. Only telegram can be connected right now."
@@ -60,12 +63,14 @@ and sends nothing.
 
 | Text (starts with) | Meaning and what to do |
 |---|---|
-| `Telegram is not connected. Ask the user to open <url> and scan the QR code…` | Show the link; wait for the user; `connection_status`; retry once |
+| `Telegram is not connected. Ask the user to open <url> and scan the QR code…` | Show the (sensitive) link to the user only; wait for them; `connection_status`; retry once |
+| `Rate limit: at most 30 Social Connect calls per minute. Wait a minute, then continue.` | Per-account limit on tool calls: stop, wait a minute, retry once |
 | `Telegram is rate-limiting this account. Try again in N seconds/minutes/hours.` | Flood wait: stop, tell the user, retry once after N |
 | `The Telegram session has ended. Connect again to continue.` | `connect_account` for a fresh link |
 | `Could not reach Telegram. Please try again.` | Transient: retry once after a few seconds |
 | `WhatsApp is coming soon…` | Only Telegram can be connected today |
 | HTTP 401 on `/mcp` | Sign-in expired or revoked: sign in again |
+| `invalid_grant`: `Encryption keys changed; connect this assistant again.` (token refresh) | The account's key was reset and the grant revoked: sign in again (`/mcp`; an agent runs `signup` and `authorize` again with its recovery code) |
 
 `chat_ref` from another account, or an edited one, is rejected: always use the value the last
 `list_recent_chats` returned.
