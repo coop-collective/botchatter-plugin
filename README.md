@@ -186,3 +186,18 @@ Update the skill, the snippet and this table when those change.
 ## License
 
 [MIT](LICENSE). Copyright 2026 Coop.
+
+## Grok Bot and Cursor
+
+This repository is also a Cursor plugin (`.cursor-plugin/plugin.json`, `mcp.json`, `assets/logo.svg`), which is the
+format Grok Bot uses for connectors.
+
+- **Grok Bot:** Connect apps → Add → custom MCP server `https://staging.cooposio.com/mcp`, then sign in with your email
+  code and approve. In chat, say "connect my Telegram" (or WhatsApp): Social Connect shows the risks, then a QR code right
+  in the chat to scan from your phone (Telegram: Settings → Devices → Link Desktop Device; WhatsApp: Settings → Linked
+  devices). Telegram can also connect with your phone number and login code. If anything needs a browser (Telegram
+  two-step password), you get a link.
+- **Cursor:** add `{"mcpServers":{"social-connect":{"url":"https://staging.cooposio.com/mcp"}}}` to `~/.cursor/mcp.json`,
+  or install this repo as a plugin.
+- The connector uses OAuth (no tokens in this repo). Privacy policy: https://staging.cooposio.com/privacy-policy ·
+  Terms: https://staging.cooposio.com/terms
