@@ -1,0 +1,21 @@
+{
+  "name": "social-connect",
+  "displayName": "Social Connect",
+  "version": "0.1.0",
+  "description": "Lets your AI assistant read your own Telegram chats (personal WhatsApp coming) through the hosted Social Connect MCP server: sign in with an email code, connect Telegram by scanning a QR code, list recent chats, read recent messages, and propose a reply that is never sent unless you approve it in the web app. Includes headless agent sign-up for autonomous agents with their own mailbox, and reading etiquette (ask first, summarize, bounded reads).",
+  "author": {
+    "name": "Social Connect"
+  },
+  "license": "MIT",
+  "keywords": [
+    "social-connect",
+    "telegram",
+    "whatsapp",
+    "messaging",
+    "chats",
+    "mcp",
+    "oauth",
+    "agents"
+  ],
+  "mcpServers": "./.codex-mcp.json"
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "social-connect": {
+      "type": "http",
+      "url": "https://staging.cooposio.com/mcp"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "social-connect-plugin",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "test": "sh test/script-tests.sh"
+  }
+}
