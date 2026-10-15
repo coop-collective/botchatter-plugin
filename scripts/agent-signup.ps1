@@ -293,7 +293,7 @@ function Cmd-Connect {
 }
 
 function Cmd-Call([string]$Tool, [string]$ArgsJson) {
-  if (-not $Tool) { Fail 'call: name a tool (connection_status, connect_account, list_recent_chats, read_recent_messages, request_reply_approval)' }
+  if (-not $Tool) { Fail 'call: name a tool (for example catch_up, get_mentions, find_chats, read_recent_messages, list_reply_requests; all 17 are in skills/social-connect/references/mcp-tools.md)' }
   if ($Tool -notmatch '^[a-z_]+$') { Fail "call: not a tool name: $Tool" }
   $out = Invoke-Tool $Tool $ArgsJson
   Say $out

@@ -1,25 +1,39 @@
 ---
 name: social-connect
-description: Read the user's own Telegram and personal WhatsApp chats (WhatsApp in beta) through the Social Connect MCP server, and propose replies they approve themselves. Use when the user asks to catch up on, summarize, triage or search their recent Telegram or WhatsApp messages, draft a reply to a Telegram or WhatsApp chat, connect Telegram or WhatsApp to their assistant, sign in to Social Connect, or when an autonomous agent with its own mailbox needs a Social Connect account (agent sign-up). Also use on a Social Connect tool error (not connected, rate-limited, unauthorized). Not for sending messages directly, bulk messaging, or other people's accounts.
+description: Read the user's own Telegram and personal WhatsApp chats (WhatsApp in beta) through the Social Connect MCP server, and propose replies that are sent only after the user approves each one. Use when the user asks to catch up on, summarize, triage or search their Telegram or WhatsApp messages, find a chat, contact or mention, open a photo or file from a chat, draft or follow up on a reply, choose which chats assistants may see (privacy rules), connect Telegram or WhatsApp to their assistant, sign in to Social Connect, or when an autonomous agent with its own mailbox needs a Social Connect account (agent sign-up). Also use on a Social Connect tool error (not connected, rate-limited, unauthorized). Not for sending messages directly, bulk messaging, or other people's accounts.
 ---
 
 # Social Connect
 
 Social Connect is a hosted remote MCP server (`social-connect`) that lets an assistant read the
-**user's own** Telegram and personal WhatsApp chats and propose a reply that the user approves
-in the Social Connect web app. **WhatsApp is beta**: it has not yet been tested against a real
+**user's own** Telegram and personal WhatsApp chats and propose replies. A reply is sent only
+after the user approves it in the Social Connect web app, and then exactly once. **WhatsApp is beta**: it has not yet been tested against a real
 account, so say so when the user connects it or relies on it. Default host: `https://staging.cooposio.com` (MCP at `/mcp`); a custom
 host is set with `/social-connect:host <url>`.
 
-## Tools (server `social-connect`)
+## Tools (server `social-connect`, 17)
 
-| Tool | Use |
+| Need | Tool |
 |---|---|
-| `connection_status()` | Call first. `{telegram: {state, account}, whatsapp: {state, account, messages_synced}}` |
-| `connect_account({provider: "telegram" \| "whatsapp"})` | `{connect_url, expires_in_seconds: 1800}`: a link **for the human** to open |
-| `list_recent_chats({limit: 1..20 = 10, provider?})` | Newest first, both providers merged unless `provider` is given: `provider`, `chat_ref`, `title`, `type`, `unread_count` (null on WhatsApp), `last_message_at` |
-| `read_recent_messages({chat_ref, limit: 1..30 = 20})` | `{provider, messages: [{id, from, date, text}], sync?}`, text only, newest first. Never marks anything read |
-| `request_reply_approval({chat_ref, text})` | Creates a **pending** reply and returns `approval_url`. Nothing is sent |
+| Is anything connected? | `connection_status()`: call first |
+| Connect an account | `connect_account({provider})` → `connect_url` for the human (sensitive) |
+| What's new? | **`catch_up({provider?, since?, max_chats ≤ 20, per_chat ≤ 10})`**: one call, chats with activity since the last catch_up, each with its latest messages |
+| What needs my answer? | `get_mentions({provider?, limit ≤ 30})`: @mentions and replies to the user |
+| Find a chat by name | `find_chats({query, type?, provider?, limit ≤ 20})`, not only recent ones |
+| Latest chats | `list_recent_chats({limit ≤ 20, provider?})` |
+| Group details, members | `get_chat_info({chat_ref, member_limit ≤ 100})` |
+| Find a person | `find_contacts({query, provider?, limit ≤ 50})`: phones masked; a 1:1 `chat_ref` when one exists |
+| Read one chat | `read_recent_messages({chat_ref, limit ≤ 30, before?})` → `{provider, messages, sync?}`; page back with `before` |
+| Around one message | `get_message_context({chat_ref, message_id, before ≤ 15, after ≤ 15})` |
+| Search | `search_messages({query, provider?, chat_ref?, limit ≤ 20, type?})`: every word must match |
+| Open a photo or file | `get_media({chat_ref, message_id})`: up to 5 MB, nothing stored |
+| Propose a reply | `request_reply_approval({chat_ref, text})` → pending, `approval_url` |
+| Follow up on replies | `list_reply_requests({state?, limit ≤ 50})`, `cancel_reply_request({approval_id})` |
+| Privacy | `get_privacy_settings()`, `propose_privacy_rules({mode?, rules})` → `review_url` |
+
+MCP prompts (slash commands in clients that support them): `catch_me_up`, `draft_replies`,
+`classify_chats_for_privacy`. Full schemas, results and error texts:
+[references/mcp-tools.md](references/mcp-tools.md).
 
 `chat_ref` is an opaque signed token bound to this user's account (`cr1.…` Telegram, `wr1.…`
 WhatsApp): pass it back unchanged, never invent or edit one. Say which app a chat is from when
@@ -28,7 +42,8 @@ you summarize across both.
 **WhatsApp history is partial.** WhatsApp only has the messages that arrived while it was
 connected. When `sync.state` is `"partial"`, older messages may be missing: say so ("I can only
 see messages since <oldest_synced>") instead of claiming there are none or that a conversation
-started there. Never infer silence from a partial sync. Full schemas and error texts: [references/mcp-tools.md](references/mcp-tools.md).
+started there. Never infer silence from a partial sync. The same holds for `catch_up` and
+`search_messages` on WhatsApp: they only see captured messages.
 
 ## (a) A person in Claude Code or Codex
 
@@ -74,7 +89,7 @@ sh $S signup agent@example.org --agent-name "Example Agent"   # registers a clie
 printf '%s\n' "$CODE" | sh $S authorize --code -   # trades it for tokens; stores them and the recovery code
 sh $S connect                                 # prints connect_url: give it to your human
 sh $S status                                  # after they say it is done
-sh $S call list_recent_chats '{"limit":10}'   # any tool; exit 3 when the tool reports an error
+sh $S call catch_up '{"max_chats":10}'        # any tool; exit 3 when the tool reports an error
 ```
 
 The raw HTTP flow, for an agent that cannot run the script, is in
@@ -110,18 +125,38 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
 - **Ask before reading.** Reading private chats needs a clear request from the user in this
   conversation ("catch me up on Telegram", "what did Ana say?"). Do not browse chats on your own
   initiative, and say which chat you are about to open when it is not obvious.
-- **Bounded reads.** At most 20 chats per `list_recent_chats` and 30 messages per
-  `read_recent_messages` (the server enforces this too). Start small (10 chats; 20 messages in
-  the chats that matter), and read more only when the user asks. No sweeping every chat, no
-  history export.
+- **Use the right tool, few calls.** "What's new" → `catch_up` (then `get_mentions` for what
+  needs an answer), not `list_recent_chats` followed by `read_recent_messages` on each chat. A
+  chat by name → `find_chats`. One search hit → `get_message_context`. Every call counts toward
+  the 30-a-minute limit.
+- **Bounded reads.** At most 20 chats and 30 messages per call (the server enforces this too).
+  Start small, and read more or page back with `before` only when the user asks. No sweeping
+  every chat, no history export.
+- **Ask before opening media or contacts unrelated to the request.** `get_media` and
+  `find_contacts` / `get_chat_info` members are for what the user asked about. Phone numbers are
+  masked by default; do not try to unmask them, and repeat a full number only when the user
+  asked for that person's number.
 - **Summarize, do not dump.** Give who said what and what needs an answer, in a few lines per
   chat. Quote a message verbatim only when the user asks or the exact wording matters. Do not
   copy message contents into files, issues, commits or other tools unless asked.
-- **Replies need the human.** `request_reply_approval` only creates a pending reply: show the
-  draft, give the `approval_url`, and say plainly that nothing is sent until they approve it in
-  the web app (and that sending is disabled on staging). Never claim a message was sent. Never
-  pressure, nag or hurry the person to approve; one mention is enough, and rejecting is fine.
-  One reply per request: no bulk replies, no messages to chats the user did not choose.
+- **Replies are sent only after the human approves.** Show the draft first and call
+  `request_reply_approval` only for drafts the user confirms. It creates a pending reply: give
+  the `approval_url` and say it is sent once, exactly as approved (they may edit it), only after
+  they approve it in the web app. **Never say it was sent until `list_reply_requests` shows state
+  `sent`** (check when the user asks, not in a polling loop). `rejected` or `withdrawn`: nothing
+  was sent, do not re-request unless asked. `failed` with `ambiguous: false`: it was not
+  delivered; say why. **`failed` with `ambiguous: true`: it may or may not have been delivered:
+  tell the user to check the chat in the app, and never request it again automatically.**
+  Withdraw a stale pending request with `cancel_reply_request`. WhatsApp replies only go to
+  chats where the other person has written first. Never pressure, nag or hurry the person to
+  approve; one mention is enough. One reply per request: no bulk replies, no messages to chats
+  the user did not choose.
+- **Hidden chats stay hidden.** The user can hide chats (blocklist) or show only some
+  (allowlist). "This chat is hidden by the user's privacy settings" means exactly that: do not
+  look for it another way (search, contacts, mentions, another provider), and do not guess its
+  contents. You may only propose rules: `propose_privacy_rules` (or the
+  `classify_chats_for_privacy` prompt) returns a `review_url`; nothing changes until the user
+  accepts there. Never say rules are applied.
 - **Not connected.** A tool error "Telegram is not connected. Ask the user to open <url> …"
   (or "WhatsApp is not connected. …") already contains a connect link (sensitive, as above):
   show it to the user only, explain the QR step (Telegram: Settings → Devices → Link Desktop
@@ -145,8 +180,8 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
 
 ## What to say about privacy
 
-Social Connect never sends without the owner's approval in the web app, and reads do not mark
-messages as read. For Telegram and WhatsApp you may say, in these words: "Your messages, contacts and
+Social Connect never sends without the owner's approval of that exact reply in the web app,
+reads do not mark messages as read, and the user decides which chats assistants can see. For Telegram and WhatsApp you may say, in these words: "Your messages, contacts and
 connection credentials are encrypted with a key that only you, and the AI apps you connect, can
 unlock. We don't keep that key." Also: "When you disconnect, we delete the key, and anything left
 behind is permanently unreadable", and "To work, our servers process your messages in memory

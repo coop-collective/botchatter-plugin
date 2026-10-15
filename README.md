@@ -3,8 +3,9 @@
 Social Connect lets your AI assistant read your own Telegram and personal WhatsApp chats and
 propose replies that you approve yourself. It is a hosted remote MCP server: you sign in with an
 email code, connect Telegram or WhatsApp by scanning a QR code, and then ask your assistant to catch you
-up, summarize a chat or draft a reply. Nothing is ever sent unless you approve it in the Social
-Connect web app, and reads never mark your messages as read. Your messages, contacts and
+up, find a chat or draft a reply. A reply is sent only after you approve it in the Social
+Connect web app, and then exactly once; reads never mark your messages as read, and you choose
+which chats assistants can see. Your messages, contacts and
 connection credentials are encrypted with a key that only you, and the AI apps you connect, can
 unlock; we don't keep that key. We connect to WhatsApp only while you're using your assistant;
 messages that arrive while you're away are fetched next time, within WhatsApp's limits.
@@ -77,11 +78,26 @@ keep it to yourself.
 
 | Tool | What it does |
 |---|---|
-| `connection_status` | Which accounts are connected |
+| `connection_status` | Which accounts are connected, and WhatsApp history import progress |
 | `connect_account({provider})` | A 30-minute link (with a 2-hour device unlock) for you to open and scan the QR code |
-| `list_recent_chats({limit ≤ 20, provider?})` | Your most recent chats across Telegram and WhatsApp, newest first, each with its `provider` |
-| `read_recent_messages({chat_ref, limit ≤ 30})` | `{provider, messages, sync?}`: recent text messages in one chat; never marks them read. WhatsApp's `sync.state: "partial"` means older messages may be missing |
-| `request_reply_approval({chat_ref, text})` | A pending reply you review, edit, approve or reject in the web app. Sending is disabled on staging |
+| `catch_up({provider?, since?, max_chats, per_chat})` | One call for "what's new": active chats since the last catch-up, each with its latest messages |
+| `get_mentions({provider?, limit})` | Messages that @mention you or reply to you |
+| `list_recent_chats({limit ≤ 20, provider?})` | Your most recent chats across Telegram and WhatsApp |
+| `find_chats({query, type?, provider?})` | Any chat or group by name, not only recent ones |
+| `get_chat_info({chat_ref})` | A group's description and members, or the other person in a private chat |
+| `find_contacts({query, provider?})` | People by name, username or number (phone numbers masked) |
+| `read_recent_messages({chat_ref, limit ≤ 30, before?})` | `{provider, messages, sync?}` for one chat, paging back with `before`; never marks anything read. WhatsApp's `sync.state: "partial"` means older messages may be missing |
+| `get_message_context({chat_ref, message_id})` | The conversation around one message |
+| `search_messages({query, provider?, chat_ref?, type?})` | Search all chats or one chat |
+| `get_media({chat_ref, message_id})` | Opens one photo, voice note or file (up to 5 MB); nothing is stored |
+| `request_reply_approval({chat_ref, text})` | A pending reply you review, edit, and approve or reject in the web app; approved, it is sent once, exactly as approved |
+| `list_reply_requests({state?})` | What happened to requested replies: pending, sending, sent, failed (maybe `ambiguous`), rejected, withdrawn |
+| `cancel_reply_request({approval_id})` | Withdraws a pending reply request |
+| `get_privacy_settings()` | Your blocklist or allowlist mode and how many rules exist |
+| `propose_privacy_rules({mode?, rules})` | Proposes chats to hide or allow; nothing changes until you accept at `review_url` |
+
+MCP prompts: `catch_me_up`, `draft_replies`, `classify_chats_for_privacy`. Chats you hide are
+invisible to every connected assistant, and an assistant can only propose privacy rules.
 
 ## Agent sign-up (autonomous agents)
 
@@ -93,7 +109,7 @@ sh scripts/agent-signup.sh signup agent@example.org --agent-name "Example Agent"
 printf '%s\n' "<code from the email>" | sh scripts/agent-signup.sh authorize --code -
 sh scripts/agent-signup.sh connect          # prints connect_url for the human
 sh scripts/agent-signup.sh status
-sh scripts/agent-signup.sh call list_recent_chats '{"limit":10}'
+sh scripts/agent-signup.sh call catch_up '{"max_chats":10}'
 ```
 
 It needs only `sh`, `curl` and `openssl`: it registers an OAuth client, builds a PKCE S256
@@ -157,11 +173,12 @@ sh test/script-tests.sh        # manifests agree, shellcheck, offline checks of 
 
 | Feature | State |
 |---|---|
-| MCP OAuth (email code sign-in, DCR and CIMD), the five tools, 30 tool calls a minute per account | Staging (`https://staging.cooposio.com`) |
+| MCP OAuth (email code sign-in, DCR and CIMD), 17 tools and 3 prompts, 30 tool calls a minute per account | Staging (`https://staging.cooposio.com`) |
 | User-keyed encryption at rest (recovery code, device unlock) | Built (connector HEAD); check staging is deployed |
 | Connect Telegram by QR inside the OAuth trip | Staging |
 | Agent sign-up (`/api/agent/*`, with the recovery code) | Built; check `GET <host>/api/agent/` answers JSON before relying on it |
-| Sending an approved reply | **Disabled** on staging (approval is recorded, nothing is sent) |
+| Sending an approved reply (once, exactly as approved; ambiguous failures never retried) | Built (connector HEAD); check staging is deployed |
+| Privacy rules (blocklist or allowlist; assistants propose, the user accepts) | Built (connector HEAD) |
 | Personal WhatsApp (connect by QR, merged chat list, partial-history `sync`) | **Beta**: built (connector HEAD), not yet tested against a real account |
 
 Update the skill, the snippet and this table when those change.
