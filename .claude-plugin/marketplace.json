@@ -10,7 +10,7 @@
     {
       "name": "social-connect",
       "source": "./",
-      "description": "Read your own Telegram and personal WhatsApp (beta) chats from your assistant: catch up, search, find chats and people, and propose replies sent only after you approve them in the web app. Includes agent sign-up for autonomous agents.",
+      "description": "Read your own Telegram and personal WhatsApp (beta) chats from your assistant: catch up, search, find chats and people, and propose replies sent only after you approve them in a form in the chat. Includes agent sign-up for autonomous agents.",
       "category": "productivity",
       "keywords": [
         "social-connect",

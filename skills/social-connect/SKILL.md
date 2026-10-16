@@ -7,7 +7,7 @@ description: Read the user's own Telegram and personal WhatsApp chats (WhatsApp 
 
 Social Connect is a hosted remote MCP server (`social-connect`) that lets an assistant read the
 **user's own** Telegram and personal WhatsApp chats and propose replies. A reply is sent only
-after the user approves it in the Social Connect web app, and then exactly once. **WhatsApp is beta**: it has not yet been tested against a real
+after the user approves it in a form the assistant app shows in the chat, and then exactly once. **WhatsApp is beta**: it has not yet been tested against a real
 account, so say so when the user connects it or relies on it. Default host: `https://staging.cooposio.com` (MCP at `/mcp`); a custom
 host is set with `/social-connect:host <url>`.
 
@@ -28,9 +28,9 @@ host is set with `/social-connect:host <url>`.
 | Around one message | `get_message_context({chat_ref, message_id, before ≤ 15, after ≤ 15})` |
 | Search | `search_messages({query, provider?, chat_ref?, limit ≤ 20, type?})`: every word must match |
 | Open a photo or file | `get_media({chat_ref, message_id})`: up to 5 MB, nothing stored |
-| Propose a reply | `request_reply_approval({chat_ref, text})` → pending, `approval_url` |
+| Propose a reply | `request_reply_approval({chat_ref, text})` → approval form in the chat; `sent`, `rejected` or `pending` |
 | Follow up on replies | `list_reply_requests({state?, limit ≤ 50})`, `cancel_reply_request({approval_id})` |
-| Privacy | `get_privacy_settings()`, `propose_privacy_rules({mode?, rules})` → `review_url` |
+| Privacy | `get_privacy_settings()`, `propose_privacy_rules({mode?, rules})` → approval form in the chat |
 
 MCP prompts (slash commands in clients that support them): `catch_me_up`, `draft_replies`,
 `classify_chats_for_privacy`. Full schemas, results and error texts:
@@ -157,9 +157,12 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
   chat. Quote a message verbatim only when the user asks or the exact wording matters. Do not
   copy message contents into files, issues, commits or other tools unless asked.
 - **Replies are sent only after the human approves.** Show the draft first and call
-  `request_reply_approval` only for drafts the user confirms. It creates a pending reply: give
-  the `approval_url` and say it is sent once, exactly as approved (they may edit it), only after
-  they approve it in the web app. **Never say it was sent until `list_reply_requests` shows state
+  `request_reply_approval` only for drafts the user confirms. Tell the user an approval form will
+  appear in the chat: they can edit the text there, then approve or decline. The app renders the
+  form and only the user can answer it; never approve on their behalf. Approved, it is sent once,
+  exactly as approved, and the result has state `sent` (with the final `text`). `pending` means
+  they have not answered yet (about 2 minutes): a late answer still applies, and it expires unsent
+  after 15 minutes. **Never say it was sent unless the result or `list_reply_requests` shows state
   `sent`** (check when the user asks, not in a polling loop). `rejected` or `withdrawn`: nothing
   was sent, do not re-request unless asked. `failed` with `ambiguous: false`: it was not
   delivered; say why. **`failed` with `ambiguous: true`: it may or may not have been delivered:
@@ -167,13 +170,17 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
   Withdraw a stale pending request with `cancel_reply_request`. WhatsApp replies only go to
   chats where the other person has written first. Never pressure, nag or hurry the person to
   approve; one mention is enough. One reply per request: no bulk replies, no messages to chats
-  the user did not choose.
+  the user did not choose. Sending needs the Plus plan: on Free the tool refuses before any form
+  is shown; pass that on. Apps that can't show approval forms (no MCP form elicitation) cannot
+  send or change privacy rules: the tool says so and nothing is drafted. Grok Bot and Cursor
+  support forms.
 - **Hidden chats stay hidden.** The user can hide chats (blocklist) or show only some
   (allowlist). "This chat is hidden by the user's privacy settings" means exactly that: do not
   look for it another way (search, contacts, mentions, another provider), and do not guess its
   contents. You may only propose rules: `propose_privacy_rules` (or the
-  `classify_chats_for_privacy` prompt) returns a `review_url`; nothing changes until the user
-  accepts there. Never say rules are applied.
+  `classify_chats_for_privacy` prompt) shows them in a form in the chat; nothing changes unless
+  the user accepts. Never say rules are applied unless the result has state `accepted`. The user
+  can also add or remove rules by hand on the website's Privacy page.
 - **Not connected.** A tool error "Telegram is not connected. Ask the user to open <url> …"
   (or "WhatsApp is not connected. …") already contains a connect link (sensitive, as above):
   show it to the user only, explain the QR step (Telegram: Settings → Devices → Link Desktop
@@ -197,7 +204,7 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
 
 ## What to say about privacy
 
-Social Connect never sends without the owner's approval of that exact reply in the web app,
+Social Connect never sends without the owner's approval of that exact reply in the chat,
 reads do not mark messages as read, and the user decides which chats assistants can see. For Telegram and WhatsApp you may say, in these words: "Your messages, contacts and
 connection credentials are encrypted with a key that only you, and the AI apps you connect, can
 unlock. We don't keep that key." Also: "When you disconnect, we delete the key, and anything left

@@ -124,14 +124,24 @@ resource. Ask before opening media unrelated to the user's request.
 
 ### request_reply_approval({ chat_ref, text: 1..4000 chars })
 
+The assistant app shows the user an approval form in the chat (MCP form elicitation; the app
+renders it and the model cannot answer it). The form shows the provider, chat and exact text;
+the user may edit the text, then approves or declines. Approval sends it once, exactly as
+approved, and the call returns:
+
 ```json
-{ "approval_id": "…", "approval_url": "https://…/approvals/…", "state": "pending",
-  "note": "Not sent yet. The user must review and approve it at approval_url; it is then sent once, exactly as approved. Never claim it was sent until list_reply_requests shows state 'sent'." }
+{ "approval_id": "…", "state": "sent", "text": "final text, as approved", "approval_url": "https://…/approvals/…" }
 ```
 
-The user reviews the provider, account, chat and exact text, may edit it, and approves or
-rejects it. Approval sends it once, exactly as approved; repeated clicks never send twice.
-WhatsApp replies only go to chats where the other person has written first.
+Other results: `state: "failed"` with `error` and `ambiguous` (as below); `state: "rejected"`
+when the user declines (nothing sent); `state: "pending"` with a `note` when the user has not
+answered within about 2 minutes. A late answer still applies; unanswered requests expire after
+15 minutes and are never sent (state `withdrawn`). `approval_url` is a read-only record page on
+the website. Never claim it was sent unless the result or `list_reply_requests` shows `sent`.
+
+Sending needs the Plus plan: on Free the tool refuses up front ("Sending replies needs the Plus
+plan…") before any form is shown. WhatsApp replies only go to chats where the other person has
+written first.
 
 ### list_reply_requests({ state?, limit: 1..50 = 20 })
 
@@ -162,9 +172,12 @@ exist, and `manage_url`. Hidden chats are invisible to every connected assistant
 
 ### propose_privacy_rules({ mode?, rules: [{ chat_ref, decision: "allow" | "block", reason }] })
 
-1 to 200 rules, each with a one-line `reason`. Returns `{proposal_id, review_url, state:
-"pending", note}`. Nothing changes until the user reviews it at `review_url`, where they can
-accept all, some rows, or reject it (proposals expire after 7 days). Never say rules are applied.
+1 to 200 rules, each with a one-line `reason`. The app shows the proposed rules in a form in
+the chat. Accept applies all of them (and the mode) at once and returns `{proposal_id, state:
+"accepted", rules_applied, mode_changed}`; decline returns `state: "rejected"` and nothing
+changes. Unanswered, it returns `state: "pending"` (proposals expire after 7 days). Never say
+rules are applied unless the state is `accepted`. The user can also add or remove rules by hand
+on the website's Privacy page.
 
 ## Prompts
 
@@ -185,6 +198,8 @@ accept all, some rows, or reject it (proposals expire after 7 days). Never say r
 | `The Telegram session has ended. Connect again to continue.` | `connect_account` for a fresh link |
 | `Could not reach Telegram. Please try again.` | Transient: retry once after a few seconds |
 | HTTP 401 on `/mcp` | Sign-in expired or revoked: sign in again |
+| `This assistant app can't show approval forms (MCP elicitation), …` | `request_reply_approval` and `propose_privacy_rules` only: nothing was sent, drafted or changed. Tell the user to use an app that supports approval forms (Grok Bot, Cursor) |
+| `Sending replies needs the Plus plan. …` | Nothing was drafted or sent; pass on the upgrade link |
 | `invalid_grant`: `Encryption keys changed; connect this assistant again.` (token refresh) | The account's key was reset and the grant revoked: sign in again (`/mcp`; an agent runs `signup` and `authorize` again with its recovery code) |
 
 A `chat_ref` from another account, or an edited one, is rejected: always use the value a tool

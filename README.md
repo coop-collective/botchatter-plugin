@@ -3,9 +3,9 @@
 Social Connect lets your AI assistant read your own Telegram and personal WhatsApp chats and
 propose replies that you approve yourself. It is a hosted remote MCP server: you sign in with an
 email code, connect Telegram or WhatsApp by scanning a QR code, and then ask your assistant to catch you
-up, find a chat or draft a reply. A reply is sent only after you approve it in the Social
-Connect web app, and then exactly once; reads never mark your messages as read, and you choose
-which chats assistants can see. Your messages, contacts and
+up, find a chat or draft a reply. A reply is sent only after you approve it in a form your
+assistant app shows in the chat, and then exactly once; reads never mark your messages as read,
+and you choose which chats assistants can see. Your messages, contacts and
 connection credentials are encrypted with a key that only you, and the AI apps you connect, can
 unlock; we don't keep that key. We connect to WhatsApp only while you're using your assistant;
 messages that arrive while you're away are fetched next time, within WhatsApp's limits.
@@ -90,14 +90,17 @@ keep it to yourself.
 | `get_message_context({chat_ref, message_id})` | The conversation around one message |
 | `search_messages({query, provider?, chat_ref?, type?})` | Search all chats or one chat |
 | `get_media({chat_ref, message_id})` | Opens one photo, voice note or file (up to 5 MB); nothing is stored |
-| `request_reply_approval({chat_ref, text})` | A pending reply you review, edit, and approve or reject in the web app; approved, it is sent once, exactly as approved |
+| `request_reply_approval({chat_ref, text})` | Shows you an approval form in the chat with the exact text; you can edit it, then approve or decline. Approved, it is sent once, exactly as approved, and the result says `sent` (Plus plan) |
 | `list_reply_requests({state?})` | What happened to requested replies: pending, sending, sent, failed (maybe `ambiguous`), rejected, withdrawn |
 | `cancel_reply_request({approval_id})` | Withdraws a pending reply request |
 | `get_privacy_settings()` | Your blocklist or allowlist mode and how many rules exist |
-| `propose_privacy_rules({mode?, rules})` | Proposes chats to hide or allow; nothing changes until you accept at `review_url` |
+| `propose_privacy_rules({mode?, rules})` | Shows the proposed rules in a form in the chat; nothing changes unless you accept |
 
 MCP prompts: `catch_me_up`, `draft_replies`, `classify_chats_for_privacy`. Chats you hide are
 invisible to every connected assistant, and an assistant can only propose privacy rules.
+Apps that can't show approval forms (MCP form elicitation) can read but cannot send replies or
+change privacy rules; Grok Bot and Cursor support them. The Social Connect website's Activity
+page is a read-only record of every reply request and how it was decided.
 
 ## Agent sign-up (autonomous agents)
 
@@ -177,8 +180,8 @@ sh test/script-tests.sh        # manifests agree, shellcheck, offline checks of 
 | User-keyed encryption at rest (recovery code, device unlock) | Built (connector HEAD); check staging is deployed |
 | Connect Telegram by QR inside the OAuth trip | Staging |
 | Agent sign-up (`/api/agent/*`, with the recovery code) | Built; check `GET <host>/api/agent/` answers JSON before relying on it |
-| Sending an approved reply (once, exactly as approved; ambiguous failures never retried) | Built (connector HEAD); check staging is deployed |
-| Privacy rules (blocklist or allowlist; assistants propose, the user accepts) | Built (connector HEAD) |
+| Sending an approved reply (approved in a form in the chat; once, exactly as approved; ambiguous failures never retried; Plus plan) | Staging |
+| Privacy rules (blocklist or allowlist; assistants propose, the user accepts in a form in the chat) | Staging |
 | Personal WhatsApp (connect by QR, merged chat list, partial-history `sync`) | **Beta**: built (connector HEAD), not yet tested against a real account |
 
 Update the skill, the snippet and this table when those change.
