@@ -1,14 +1,14 @@
 {
-  "name": "social-connect",
-  "displayName": "Social Connect",
+  "name": "botchatter",
+  "displayName": "BotChatter",
   "version": "0.1.0",
-  "description": "Lets your AI assistant read your own Telegram and personal WhatsApp (beta) chats through the hosted Social Connect MCP server: sign in with an email code, connect by scanning a QR code, catch up, search, find chats and people, and propose replies that are sent only after you approve each one in a form in the chat. You choose which chats assistants can see. Includes headless agent sign-up for autonomous agents with their own mailbox, and etiquette (ask first, summarize, bounded reads).",
+  "description": "Lets your AI assistant read your own Telegram and personal WhatsApp (beta) chats through the hosted BotChatter MCP server: sign in with an email code, connect by scanning a QR code, catch up, search, find chats and people, and propose replies that are sent only after you approve each one in a form in the chat. You choose which chats assistants can see. Includes headless agent sign-up for autonomous agents with their own mailbox, and etiquette (ask first, summarize, bounded reads).",
   "author": {
-    "name": "Social Connect"
+    "name": "BotChatter"
   },
   "license": "MIT",
   "keywords": [
-    "social-connect",
+    "botchatter",
     "telegram",
     "whatsapp",
     "messaging",
@@ -20,9 +20,9 @@
   "userConfig": {
     "mcp_url": {
       "type": "string",
-      "title": "Social Connect MCP server URL",
-      "description": "The Social Connect MCP server this plugin connects to. /social-connect:host <url> sets it for a custom, local or staging deployment; then restart Claude Code and run /mcp to sign in.",
-      "default": "https://staging.cooposio.com/mcp"
+      "title": "BotChatter MCP server URL",
+      "description": "The BotChatter MCP server this plugin connects to. /botchatter:host <url> sets it for a custom, local or staging deployment; then restart Claude Code and run /mcp to sign in.",
+      "default": "https://staging.botchatter.ai/mcp"
     }
   }
 }

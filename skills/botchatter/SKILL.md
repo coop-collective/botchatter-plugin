@@ -1,17 +1,17 @@
 ---
-name: social-connect
-description: Read the user's own Telegram and personal WhatsApp chats (WhatsApp in beta) through the Social Connect MCP server, and propose replies that are sent only after the user approves each one. Use when the user asks to catch up on, summarize, triage or search their Telegram or WhatsApp messages, find a chat, contact or mention, open a photo or file from a chat, draft or follow up on a reply, choose which chats assistants may see (privacy rules), connect Telegram or WhatsApp to their assistant, sign in to Social Connect, or when an autonomous agent with its own mailbox needs a Social Connect account (agent sign-up). Also use on a Social Connect tool error (not connected, rate-limited, unauthorized). Not for sending messages directly, bulk messaging, or other people's accounts.
+name: botchatter
+description: Read the user's own Telegram and personal WhatsApp chats (WhatsApp in beta) through the BotChatter MCP server, and propose replies that are sent only after the user approves each one. Use when the user asks to catch up on, summarize, triage or search their Telegram or WhatsApp messages, find a chat, contact or mention, open a photo or file from a chat, draft or follow up on a reply, choose which chats assistants may see (privacy rules), connect Telegram or WhatsApp to their assistant, sign in to BotChatter, or when an autonomous agent with its own mailbox needs a BotChatter account (agent sign-up). Also use on a BotChatter tool error (not connected, rate-limited, unauthorized). Not for sending messages directly, bulk messaging, or other people's accounts.
 ---
 
-# Social Connect
+# BotChatter
 
-Social Connect is a hosted remote MCP server (`social-connect`) that lets an assistant read the
+BotChatter is a hosted remote MCP server (`botchatter`) that lets an assistant read the
 **user's own** Telegram and personal WhatsApp chats and propose replies. A reply is sent only
 after the user approves it in a form the assistant app shows in the chat, and then exactly once. **WhatsApp is beta**: it has not yet been tested against a real
-account, so say so when the user connects it or relies on it. Default host: `https://staging.cooposio.com` (MCP at `/mcp`); a custom
-host is set with `/social-connect:host <url>`.
+account, so say so when the user connects it or relies on it. Default host: `https://staging.botchatter.ai` (MCP at `/mcp`); a custom
+host is set with `/botchatter:host <url>`.
 
-## Tools (server `social-connect`, 22)
+## Tools (server `botchatter`, 22)
 
 | Need | Tool |
 |---|---|
@@ -66,8 +66,8 @@ When an account isn't connected, connect it right here instead of sending the us
 
 1. **Sign in once.** The plugin registers the MCP server over HTTP with OAuth; no token is ever
    put in a file. If the tools are missing or answer 401, ask the person to run
-   `claude mcp login plugin:social-connect:social-connect` (or `/mcp` inside a session, then pick
-   `plugin:social-connect:social-connect`); in Codex, `codex mcp login social-connect`. A browser
+   `claude mcp login plugin:botchatter:botchatter` (or `/mcp` inside a session, then pick
+   `plugin:botchatter:botchatter`); in Codex, `codex mcp login botchatter`. A browser
    opens: they enter their email, type the 6-digit code from the email, and approve the assistant.
    The first time, the page shows a **recovery code once**: tell them to save it somewhere safe
    (a password manager). It unlocks their encrypted data in a new browser; without it, a lost
@@ -77,12 +77,12 @@ When an account isn't connected, connect it right here instead of sending the us
    with Telegram on their phone (**Settings → Devices → Link Desktop Device**), or, on the phone
    itself, tap the `tg://` link. The browser then returns them to the assistant.
 3. **WhatsApp (beta):** call `connect_account({provider: "whatsapp"})` (or
-   `/social-connect:connect whatsapp`; the sign-in page also offers "Allow and connect WhatsApp").
+   `/botchatter:connect whatsapp`; the sign-in page also offers "Allow and connect WhatsApp").
    The link opens `/connect/whatsapp`, which shows a QR code. In WhatsApp on the phone:
    **Settings → Linked devices → Link a device**, then scan. The QR code must be shown on a
    computer or another screen, **not on the same phone** that scans it. Mention that WhatsApp
    support is beta and not yet tested against a real account.
-4. **Later, or if it was skipped:** `/social-connect:connect`, or call `connect_account` and show
+4. **Later, or if it was skipped:** `/botchatter:connect`, or call `connect_account` and show
    the `connect_url` (valid 30 minutes) to that person only. Wait until they say it is done, then
    `connection_status`. The link is sensitive (see "Connect links" below).
 
@@ -102,7 +102,7 @@ subcommands); in Claude Code, `${CLAUDE_PLUGIN_ROOT}/scripts/agent-signup.sh`.
 S=../../scripts/agent-signup.sh             # relative to this skill directory
 sh $S describe                               # optional: the host's own description of the steps
 sh $S signup agent@example.org --agent-name "Example Agent"   # registers a client, prepares PKCE, emails a code
-# read the 6-digit code from the agent's mailbox (subject "<code> is your Social Connect code")
+# read the 6-digit code from the agent's mailbox (subject "<code> is your BotChatter code")
 printf '%s\n' "$CODE" | sh $S authorize --code -   # trades it for tokens; stores them and the recovery code
 sh $S connect                                 # prints connect_url: give it to your human
 sh $S status                                  # after they say it is done
@@ -189,7 +189,7 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
   `connection_status` and retry once. `state: revoked` means the app ended the session (for
   example, the linked device was removed): call `connect_account` for a fresh link. WhatsApp
   `state: locked` means it is paired and reconnects on the next read.
-- **Rate limits and flood waits.** "Rate limit: at most 30 Social Connect calls per minute"
+- **Rate limits and flood waits.** "Rate limit: at most 30 BotChatter calls per minute"
   (per account), "Telegram is rate-limiting this account. Try again in N
   seconds/minutes/hours", or a sign-in 429 ("wait 30 seconds", "Wait a minute"): stop calling,
   tell the user, and retry once after the stated time (a minute for the 30-calls limit). Plan
@@ -204,7 +204,7 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
 
 ## What to say about privacy
 
-Social Connect never sends without the owner's approval of that exact reply in the chat,
+BotChatter never sends without the owner's approval of that exact reply in the chat,
 reads do not mark messages as read, and the user decides which chats assistants can see. For Telegram and WhatsApp you may say, in these words: "Your messages, contacts and
 connection credentials are encrypted with a key that only you, and the AI apps you connect, can
 unlock. We don't keep that key." Also: "When you disconnect, we delete the key, and anything left

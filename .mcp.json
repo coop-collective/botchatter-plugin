@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "social-connect": {
+    "botchatter": {
       "type": "http",
       "url": "${user_config.mcp_url}"
     }

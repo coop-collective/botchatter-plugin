@@ -1,6 +1,6 @@
 #!/bin/sh
-# Social Connect agent sign-up: an autonomous agent with its own mailbox creates and owns a
-# Social Connect account without a browser, then hands its human a link to connect Telegram.
+# BotChatter agent sign-up: an autonomous agent with its own mailbox creates and owns a
+# BotChatter account without a browser, then hands its human a link to connect Telegram.
 # Humans in Claude Code or Codex do not need this: they sign in through MCP OAuth (/mcp).
 #
 #   agent-signup.sh describe                      what this host's agent API says (GET /api/agent/)
@@ -11,12 +11,12 @@
 #                                                  it from stdin) and store them; nothing is printed
 #   agent-signup.sh status                        call the connection_status tool
 #   agent-signup.sh connect [--provider telegram] call connect_account; prints the link for the human
-#   agent-signup.sh call TOOL [JSON_ARGUMENTS]    call any Social Connect MCP tool, print its result
+#   agent-signup.sh call TOOL [JSON_ARGUMENTS]    call any BotChatter MCP tool, print its result
 #   agent-signup.sh where                         where the token and recovery code are stored (never
 #                                                  the values themselves)
 #   agent-signup.sh logout                        forget the stored token for this host (keeps the
 #                                                  recovery code)
-#   agent-signup.sh host [URL | --reset]          show, save or forget this machine's Social Connect host
+#   agent-signup.sh host [URL | --reset]          show, save or forget this machine's BotChatter host
 #
 # Needs only sh, curl and openssl. Secrets (the emailed code, the PKCE verifier, access and refresh
 # tokens, the account's recovery code) are sent on stdin, never on a command line, and are never
@@ -25,7 +25,7 @@
 # the script says so. The recovery code is returned once, the first time the account's encryption
 # key is created; every later authorize for that account sends it automatically. logout keeps it.
 # Settings:
-#   SOCIAL_CONNECT_WEB           the Social Connect host for this run; else the host saved with
+#   SOCIAL_CONNECT_WEB           the BotChatter host for this run; else the host saved with
 #                                 `host URL` (<config>/social-connect/host); else the default below
 #   SOCIAL_CONNECT_TOKEN_STORE   keychain | file (default: keychain when one works, else file)
 #   SOCIAL_CONNECT_RECOVERY_CODE the account's recovery code, when it was saved somewhere else
@@ -33,7 +33,7 @@
 set -u
 umask 077
 
-DEFAULT_WEB=https://staging.cooposio.com
+DEFAULT_WEB=https://staging.botchatter.ai
 CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/social-connect
 HOST_FILE=$CONFIG_DIR/host
 REDIRECT_URI=http://127.0.0.1:8976/callback
@@ -44,7 +44,7 @@ SOCIAL_CONNECT_TOKEN_STORE=${SOCIAL_CONNECT_TOKEN_STORE:-}
 SOCIAL_CONNECT_RECOVERY_CODE=${SOCIAL_CONNECT_RECOVERY_CODE:-}
 
 say() { printf '%s\n' "$*"; }
-warn() { printf 'social-connect: %s\n' "$*" >&2; }
+warn() { printf 'botchatter: %s\n' "$*" >&2; }
 die() { warn "$*"; exit 1; }
 
 saved_host() { [ -f "$HOST_FILE" ] && sed -n '1{s/[[:space:]]*$//;p;}' "$HOST_FILE"; }
@@ -66,7 +66,7 @@ for tool in curl openssl; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool is required"
 done
 
-TMP=$(mktemp -d "${TMPDIR:-/tmp}/social-connect.XXXXXX") || die "cannot create a temporary directory"
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/botchatter.XXXXXX") || die "cannot create a temporary directory"
 trap 'rm -rf "$TMP"' EXIT
 trap 'exit 130' INT TERM
 
@@ -180,7 +180,7 @@ secret_forget() { # SERVICE ACCOUNT FILE
 }
 
 # Tokens: "ACCESS REFRESH CLIENT_ID", one item per host.
-save_tokens() { secret_save "$KEYCHAIN_SERVICE" "$HOST_KEY" "$TOKEN_FILE" "Social Connect ($HOST_KEY)"; }
+save_tokens() { secret_save "$KEYCHAIN_SERVICE" "$HOST_KEY" "$TOKEN_FILE" "BotChatter ($HOST_KEY)"; }
 forget_tokens() { secret_forget "$KEYCHAIN_SERVICE" "$HOST_KEY" "$TOKEN_FILE"; }
 load_tokens() {
   value=$(secret_load "$KEYCHAIN_SERVICE" "$HOST_KEY" "$TOKEN_FILE")
@@ -222,7 +222,7 @@ cmd_signup() {
   done
   case $email in *@*.*) ;; *) die "signup: pass the agent's own email address" ;; esac
   { json_safe "$email" && json_safe "$agent_name"; } || die "signup: email and agent name must not contain quotes or backslashes"
-  client_name=${agent_name:-Social Connect agent}
+  client_name=${agent_name:-BotChatter agent}
 
   # 1. Register a public OAuth client (dynamic client registration).
   reg=$(printf '{"client_name":"%s","redirect_uris":["%s"],"grant_types":["authorization_code","refresh_token"],"response_types":["code"],"token_endpoint_auth_method":"none"}' \
@@ -306,9 +306,9 @@ cmd_authorize() {
   new_recovery=$(json_field "$answer" recovery_code)
   recovery_where=''
   if [ -n "$new_recovery" ]; then
-    recovery_where=$(printf '%s' "$new_recovery" | secret_save "$RECOVERY_SERVICE" "$RC_ACCOUNT" "$RC_FILE" "Social Connect recovery code ($RC_ACCOUNT)")
+    recovery_where=$(printf '%s' "$new_recovery" | secret_save "$RECOVERY_SERVICE" "$RC_ACCOUNT" "$RC_FILE" "BotChatter recovery code ($RC_ACCOUNT)")
   elif [ -n "$SOCIAL_CONNECT_RECOVERY_CODE" ]; then
-    recovery_where=$(printf '%s' "$SOCIAL_CONNECT_RECOVERY_CODE" | secret_save "$RECOVERY_SERVICE" "$RC_ACCOUNT" "$RC_FILE" "Social Connect recovery code ($RC_ACCOUNT)")
+    recovery_where=$(printf '%s' "$SOCIAL_CONNECT_RECOVERY_CODE" | secret_save "$RECOVERY_SERVICE" "$RC_ACCOUNT" "$RC_FILE" "BotChatter recovery code ($RC_ACCOUNT)")
   fi
   redirect_to=$(json_field "$answer" redirect_to)
   [ "$(query_param "$redirect_to" state)" = "$state" ] || die "authorize: the answer's state does not match this sign-up"
@@ -371,7 +371,7 @@ mcp_post() { # JSON
 }
 
 mcp_session() {
-  init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"social-connect-agent-signup","version":"0.1.0"}}}'
+  init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"botchatter-agent-signup","version":"0.1.0"}}}'
   mcp_post "$init" >/dev/null
   if [ "$(status_code)" = 401 ]; then
     REFRESH_ERROR=''
@@ -402,7 +402,7 @@ mcp_tool() { # NAME ARGUMENTS_JSON
 }
 
 cmd_call() {
-  [ $# -ge 1 ] || die "call: name a tool (for example catch_up, get_mentions, find_chats, read_recent_messages, list_reply_requests; all 17 are in skills/social-connect/references/mcp-tools.md)"
+  [ $# -ge 1 ] || die "call: name a tool (for example catch_up, get_mentions, find_chats, read_recent_messages, list_reply_requests; all 17 are in skills/botchatter/references/mcp-tools.md)"
   case $1 in *[!a-z_]*) die "call: not a tool name: $1" ;; esac
   mcp_tool "$1" "${2:-}"
 }
@@ -462,14 +462,14 @@ cmd_host() {
       rm -f "$HOST_FILE"
       say "host: forgotten; $DEFAULT_WEB from now on"
       say "mcp_url: $DEFAULT_WEB/mcp"
-      say "claude_code: printf '%s' '{\"mcp_url\":\"$DEFAULT_WEB/mcp\"}' | claude plugin configure social-connect@social-connect --values-stdin"
+      say "claude_code: printf '%s' '{\"mcp_url\":\"$DEFAULT_WEB/mcp\"}' | claude plugin configure botchatter@botchatter --values-stdin"
       return 0 ;;
     http://* | https://*) ;;
-    *) die "host: pass a URL like https://staging.cooposio.com or http://localhost:8787, or --reset" ;;
+    *) die "host: pass a URL like https://staging.botchatter.ai or http://localhost:8787, or --reset" ;;
   esac
   WEB=${1%/}
   meta=$(curl -fsS --max-time 20 "$WEB/.well-known/oauth-protected-resource/mcp") ||
-    die "cannot reach $WEB/.well-known/oauth-protected-resource/mcp (is it a Social Connect host?)"
+    die "cannot reach $WEB/.well-known/oauth-protected-resource/mcp (is it a BotChatter host?)"
   MCP_URL=$(json_field "$meta" resource)
   [ -n "$MCP_URL" ] || die "$WEB did not name its MCP resource"
   mkdir -p "$CONFIG_DIR" && chmod 700 "$CONFIG_DIR"
@@ -481,8 +481,8 @@ cmd_host() {
     say "host: saved $WEB in $HOST_FILE"
   fi
   say "mcp_url: $MCP_URL"
-  say "claude_code: printf '%s' '{\"mcp_url\":\"$MCP_URL\"}' | claude plugin configure social-connect@social-connect --values-stdin"
-  say "codex: codex mcp add social-connect-custom --url $MCP_URL"
+  say "claude_code: printf '%s' '{\"mcp_url\":\"$MCP_URL\"}' | claude plugin configure botchatter@botchatter --values-stdin"
+  say "codex: codex mcp add botchatter-custom --url $MCP_URL"
   [ -n "$SOCIAL_CONNECT_WEB" ] && [ "${SOCIAL_CONNECT_WEB%/}" != "$WEB" ] &&
     say "note: SOCIAL_CONNECT_WEB=$SOCIAL_CONNECT_WEB is set and still wins in this shell"
   return 0

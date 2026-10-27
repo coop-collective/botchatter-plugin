@@ -1,6 +1,6 @@
-# Social Connect MCP tools
+# BotChatter MCP tools
 
-Server: `social-connect`, streamable HTTP at `<host>/mcp` (default `https://staging.cooposio.com/mcp`),
+Server: `botchatter`, streamable HTTP at `<host>/mcp` (default `https://staging.botchatter.ai/mcp`),
 protected by OAuth 2.1 (PKCE S256, dynamic client registration at `/oauth/register`, Client ID
 Metadata Documents). Scope: `telegram` (it covers both providers). An unauthenticated request
 answers 401 with a `WWW-Authenticate` challenge pointing to `/.well-known/oauth-protected-resource/mcp`.
@@ -193,7 +193,7 @@ on the website's Privacy page.
 |---|---|
 | `Telegram is not connected. …` / `WhatsApp is not connected. Ask the user to open <url> and scan the QR code…` | Show the (sensitive) link to the user only; wait for them; `connection_status`; retry once |
 | `This chat is hidden by the user's privacy settings. It cannot be read, searched or replied to.` | Respect it: do not look for it another way or guess its contents |
-| `Rate limit: at most 30 Social Connect calls per minute. Wait a minute, then continue.` | Stop, wait a minute, retry once; use fewer, broader calls (`catch_up`) |
+| `Rate limit: at most 30 BotChatter calls per minute. Wait a minute, then continue.` | Stop, wait a minute, retry once; use fewer, broader calls (`catch_up`) |
 | `Telegram is rate-limiting this account. Try again in N seconds/minutes/hours.` | Flood wait: stop, tell the user, retry once after N |
 | `The Telegram session has ended. Connect again to continue.` | `connect_account` for a fresh link |
 | `Could not reach Telegram. Please try again.` | Transient: retry once after a few seconds |
