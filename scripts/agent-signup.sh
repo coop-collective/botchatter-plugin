@@ -402,7 +402,7 @@ mcp_tool() { # NAME ARGUMENTS_JSON
 }
 
 cmd_call() {
-  [ $# -ge 1 ] || die "call: name a tool (for example catch_up, get_mentions, find_chats, read_recent_messages, list_reply_requests; all 17 are in skills/botchatter/references/mcp-tools.md)"
+  [ $# -ge 1 ] || die "call: name a tool (for example catch_up, get_mentions, find_chats, read_recent_messages, draft_reply; all 23 are in skills/botchatter/references/mcp-tools.md)"
   case $1 in *[!a-z_]*) die "call: not a tool name: $1" ;; esac
   mcp_tool "$1" "${2:-}"
 }

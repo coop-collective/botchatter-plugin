@@ -1,7 +1,7 @@
 {
   "name": "botchatter",
   "version": "0.3.0",
-  "description": "Read, search and catch up on your own Telegram and WhatsApp in Grok Bot or Cursor, connect by scanning a QR code right in the chat, and draft replies that are sent only after you approve each one in a form in the chat.",
+  "description": "Read, search and catch up on your own Telegram and WhatsApp in Grok Bot or Cursor, connect by scanning a QR code right in the chat, and draft replies that are sent only after you confirm each one in the chat.",
   "author": {
     "name": "BotChatter",
     "email": "support@botchatter.ai"

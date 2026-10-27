@@ -2,7 +2,7 @@
   "name": "botchatter",
   "displayName": "BotChatter",
   "version": "0.1.0",
-  "description": "Lets your AI assistant read your own Telegram and personal WhatsApp (beta) chats through the hosted BotChatter MCP server: sign in with an email code, connect by scanning a QR code, catch up, search, find chats and people, and propose replies that are sent only after you approve each one in a form in the chat. You choose which chats assistants can see. Includes headless agent sign-up for autonomous agents with their own mailbox, and etiquette (ask first, summarize, bounded reads).",
+  "description": "Lets your AI assistant read your own Telegram and personal WhatsApp (beta) chats through the hosted BotChatter MCP server: sign in with an email code, connect by scanning a QR code, catch up, search, find chats and people, and draft replies that are sent only after you confirm each one in the chat. You choose which chats assistants can see. Includes headless agent sign-up for autonomous agents with their own mailbox, and etiquette (ask first, summarize, bounded reads).",
   "author": {
     "name": "BotChatter"
   },
