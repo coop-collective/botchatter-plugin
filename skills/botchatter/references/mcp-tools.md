@@ -171,24 +171,13 @@ changes in the chat and explicitly said yes; pass their words in `user_confirmat
 destructive. Returns `{proposal_id, state: "accepted", rules_applied, mode_changed, rules,
 manage_url}`; it appears in the Privacy page's history.
 
-### propose_privacy_rules({ mode?, rules: [{ chat_ref, decision: "allow" | "block", reason }] })
-
-For apps that show forms (MCP form elicitation); others use `apply_privacy_rules`.
-
-1 to 200 rules, each with a one-line `reason`. The app shows the proposed rules in a form in
-the chat. Accept applies all of them (and the mode) at once and returns `{proposal_id, state:
-"accepted", rules_applied, mode_changed}`; decline returns `state: "rejected"` and nothing
-changes. Unanswered, it returns `state: "pending"` (proposals expire after 7 days). Never say
-rules are applied unless the state is `accepted`. The user can also add or remove rules by hand
-on the website's Privacy page.
-
 ## Prompts
 
 | Prompt | What it does |
 |---|---|
 | `catch_me_up` | `catch_up`, then `get_mentions`; a summary by chat, most urgent first; no drafts unless asked |
 | `draft_replies` | Finds what needs a reply, writes replies in the user's tone; for each one the user wants: `draft_reply`, show it, `send_reply` after the user's yes |
-| `classify_chats_for_privacy` | Sorts chats into work, personal, family, sensitive; asks what assistants may see; calls `propose_privacy_rules` once |
+| `classify_chats_for_privacy` | Sorts chats into work, personal, family, sensitive; asks what assistants may see; shows the exact changes and calls `apply_privacy_rules` after the user's yes |
 
 ## Errors
 
@@ -201,7 +190,6 @@ on the website's Privacy page.
 | `The Telegram session has ended. Connect again to continue.` | `connect_account` for a fresh link |
 | `Could not reach Telegram. Please try again.` | Transient: retry once after a few seconds |
 | HTTP 401 on `/mcp` | Sign-in expired or revoked: sign in again |
-| `This assistant app can't show approval forms (MCP elicitation), …` | `propose_privacy_rules` only: nothing changed. Show the user the exact changes and, after their yes, call `apply_privacy_rules` |
 | `Sending messages needs the Pro plan. …` | Nothing was drafted or sent; pass on the upgrade link |
 | `Nothing was sent: …` (from `send_reply`) | The draft was unknown, already sent, failed, expired or withdrawn, or the plan changed: tell the user; draft again only if they still want to send |
 | `… is paused: the user's plan reads fewer accounts …` | Pass on the upgrade link; do not retry |

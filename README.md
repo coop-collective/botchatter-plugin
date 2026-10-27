@@ -94,7 +94,6 @@ keep it to yourself.
 | `send_reply({draft_id, user_confirmation})` | After you say yes, sends exactly that draft, once; the result says `sent` (Pro plan). Your app may ask you to allow the call too |
 | `get_privacy_settings()` | Your blocklist or allowlist mode and how many rules exist |
 | `apply_privacy_rules({mode?, rules, user_confirmation})` | Hides or shows the chats you confirmed in the chat |
-| `propose_privacy_rules({mode?, rules})` | Shows the proposed rules in a form in the chat (apps that show forms); nothing changes unless you accept |
 | `start_connect`, `check_connect`, `connect_with_phone`, `submit_login_code`, `cancel_connect` | Connect an account right in the chat (QR image, or Telegram by phone) |
 | `get_web_sign_in_link()` | A one-time link that signs you in to the BotChatter website |
 
@@ -177,7 +176,7 @@ sh test/script-tests.sh        # manifests agree, shellcheck, offline checks of 
 
 | Feature | State |
 |---|---|
-| MCP OAuth (email code sign-in, DCR and CIMD), 23 tools and 3 prompts, 30 tool calls a minute per account | Staging (`https://staging.botchatter.ai`) |
+| MCP OAuth (email code sign-in, DCR and CIMD), 22 tools and 3 prompts, 30 tool calls a minute per account | Staging (`https://staging.botchatter.ai`) |
 | User-keyed encryption at rest (recovery code, device unlock) | Built (connector HEAD); check staging is deployed |
 | Connect Telegram by QR inside the OAuth trip | Staging |
 | Agent sign-up (`/api/agent/*`, with the recovery code) | Built; check `GET <host>/api/agent/` answers JSON before relying on it |

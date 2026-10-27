@@ -12,7 +12,7 @@ sends exactly that draft, once. **WhatsApp is beta**: it has not yet been tested
 account, so say so when the user connects it or relies on it. Default host: `https://staging.botchatter.ai` (MCP at `/mcp`); a custom
 host is set with `/botchatter:host <url>`.
 
-## Tools (server `botchatter`, 23)
+## Tools (server `botchatter`, 22)
 
 | Need | Tool |
 |---|---|
@@ -31,7 +31,7 @@ host is set with `/botchatter:host <url>`.
 | Open a photo or file | `get_media({chat_ref, message_id})`: up to 5 MB, nothing stored |
 | Send a message (step 1) | `draft_reply({chat_ref, text})` → `{draft_id, chat_title, provider, text, expires_at, next}`; nothing is sent |
 | Send a message (step 2) | `send_reply({draft_id, user_confirmation})`: only after the user said yes to that draft; sends it once → state `sent` |
-| Privacy | `get_privacy_settings()`; `apply_privacy_rules({mode?, rules, user_confirmation})` after the user's yes; `propose_privacy_rules({mode?, rules})` → a form, in apps that show forms |
+| Privacy | `get_privacy_settings()`; `apply_privacy_rules({mode?, rules, user_confirmation})` after the user's yes |
 | The BotChatter website | `get_web_sign_in_link()` → a one-time sign-in link for the user |
 
 MCP prompts (slash commands in clients that support them): `catch_me_up`, `draft_replies`,
@@ -180,9 +180,8 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
   (allowlist). "This chat is hidden by the user's privacy settings" means exactly that: do not
   look for it another way (search, contacts, mentions, another provider), and do not guess its
   contents. To change rules, show the user the exact chats and changes and, only after they
-  explicitly say yes, call `apply_privacy_rules` with their words in `user_confirmation`. In
-  apps that show forms, `propose_privacy_rules` (or the `classify_chats_for_privacy` prompt)
-  shows them in a form instead. Never say rules are applied unless the result has state `accepted`. The user
+  explicitly say yes, call `apply_privacy_rules` with their words in `user_confirmation`. The
+  `classify_chats_for_privacy` prompt walks through this. Never say rules are applied unless the result has state `accepted`. The user
   can also add or remove rules by hand on the website's Privacy page.
 - **Not connected.** A tool error "Telegram is not connected. Ask the user to open <url> …"
   (or "WhatsApp is not connected. …") already contains a connect link (sensitive, as above):
