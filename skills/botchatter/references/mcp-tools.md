@@ -1,6 +1,6 @@
-# Social Connect MCP tools
+# BotChatter MCP tools
 
-Server: `social-connect`, streamable HTTP at `<host>/mcp` (default `https://staging.cooposio.com/mcp`),
+Server: `botchatter`, streamable HTTP at `<host>/mcp` (default `https://staging.botchatter.ai/mcp`),
 protected by OAuth 2.1 (PKCE S256, dynamic client registration at `/oauth/register`, Client ID
 Metadata Documents). Scope: `telegram` (it covers both providers). An unauthenticated request
 answers 401 with a `WWW-Authenticate` challenge pointing to `/.well-known/oauth-protected-resource/mcp`.
@@ -120,72 +120,64 @@ Downloads one photo, video, voice note or document from a message (up to 5 MB) s
 at it; nothing is stored. Returns `{mimetype, file_name, size}` plus an image, or a file
 resource. Ask before opening media unrelated to the user's request.
 
-## Replies (sent only after the user approves each one)
+## Sending (draft, the user confirms in the chat, send)
 
-### request_reply_approval({ chat_ref, text: 1..4000 chars })
+All approval happens in the assistant app's chat; the BotChatter website only keeps a read-only
+record (Replies page). These are the only two sending tools.
 
-The assistant app shows the user an approval form in the chat (MCP form elicitation; the app
-renders it and the model cannot answer it). The form shows the provider, chat and exact text;
-the user may edit the text, then approves or declines. Approval sends it once, exactly as
-approved, and the call returns:
+### draft_reply({ chat_ref, text: 1..4000 chars })
 
-```json
-{ "approval_id": "…", "state": "sent", "text": "final text, as approved", "approval_url": "https://…/approvals/…" }
-```
-
-Other results: `state: "failed"` with `error` and `ambiguous` (as below); `state: "rejected"`
-when the user declines (nothing sent); `state: "pending"` with a `note` when the user has not
-answered within about 2 minutes. A late answer still applies; unanswered requests expire after
-15 minutes and are never sent (state `withdrawn`). `approval_url` is a read-only record page on
-the website. Never claim it was sent unless the result or `list_reply_requests` shows `sent`.
-
-Sending needs the Plus plan: on Free the tool refuses up front ("Sending replies needs the Plus
-plan…") before any form is shown. WhatsApp replies only go to chats where the other person has
-written first.
-
-### list_reply_requests({ state?, limit: 1..50 = 20 })
+Queues one draft and sends nothing (no form, not destructive). Returns:
 
 ```json
-[{ "approval_id": "…", "approval_url": "…", "provider": "telegram", "chat_ref": "cr1.…", "chat_title": "Ana B.",
-   "text": "final text, as edited", "state": "failed", "created_at": "…", "decided_at": "…",
-   "error": "Telegram did not confirm the send. It may or may not have been delivered; check the chat in Telegram. It was not retried.",
-   "ambiguous": true }]
+{ "draft_id": "…", "chat_title": "Ana B.", "provider": "telegram", "text": "exact text", "state": "pending",
+  "expires_at": "…", "next": "Show the user the chat and exact text and ask them to confirm. When they say yes, call send_reply with this draft_id." }
 ```
 
-`state`: `pending`, `sending`, `sent`, `failed`, `rejected` or `withdrawn`. Only `sent` means
-sent. `failed` carries `error` and `ambiguous`: `false` means nothing was delivered; `true`
-means it may or may not have been delivered (no confirmation): tell the user to check the chat,
-and never request it again automatically. `sending` that never resolves is also reported as an
-ambiguous failure, never retried.
+A further account of a provider adds `account: {id, label}`. Show the user the chat and the exact
+text and ask them to confirm. To change the text, draft again; an unsent draft expires after 15
+minutes. Sending needs the Pro plan: on Free this refuses up front ("Sending messages needs the
+Pro plan. Nothing was drafted or sent; …"). WhatsApp messages only go to chats where the other
+person has written first.
 
-### cancel_reply_request({ approval_id })
+### send_reply({ draft_id, user_confirmation: 1..500 chars })
 
-Withdraws one of your pending requests (for example, it is stale). Returns `{approval_id, state:
-"withdrawn"}`, or a `note` when it is no longer pending (already decided) or does not exist.
+Annotated destructive and open-world, so apps with a tool-call approval step show it to the user
+first. Call it only after the user's own next message explicitly said yes to that draft, and pass
+their words verbatim in `user_confirmation`. Sends exactly the draft's text to its chat, from the
+account it was drafted for, once:
 
-## Privacy (the user decides; assistants can only propose)
+```json
+{ "draft_id": "…", "state": "sent", "chat_title": "Ana B.", "provider": "telegram", "text": "exact text", "sent_at": "…" }
+```
+
+Or `state: "failed"` with `error` and `ambiguous`: `false` means nothing was delivered; `true`
+means it may or may not have been delivered (no confirmation): tell the user to check the chat.
+A failed send is never retried. Refused, with `Nothing was sent: …`, when the draft is unknown or
+another user's, already sent, being sent, failed, withdrawn, expired (15 minutes), or the plan
+no longer includes sending. Never claim it was sent unless the state is `sent`.
+
+## Privacy (the user decides)
 
 ### get_privacy_settings()
 
 The mode (`blocklist`: hide listed chats; `allowlist`: show only listed chats), how many rules
 exist, and `manage_url`. Hidden chats are invisible to every connected assistant.
 
-### propose_privacy_rules({ mode?, rules: [{ chat_ref, decision: "allow" | "block", reason }] })
+### apply_privacy_rules({ mode?, rules: [{ chat_ref, decision: "allow" | "block", reason }], user_confirmation })
 
-1 to 200 rules, each with a one-line `reason`. The app shows the proposed rules in a form in
-the chat. Accept applies all of them (and the mode) at once and returns `{proposal_id, state:
-"accepted", rules_applied, mode_changed}`; decline returns `state: "rejected"` and nothing
-changes. Unanswered, it returns `state: "pending"` (proposals expire after 7 days). Never say
-rules are applied unless the state is `accepted`. The user can also add or remove rules by hand
-on the website's Privacy page.
+Applies the rules (and the mode) at once, only after the user saw the exact list of chats and
+changes in the chat and explicitly said yes; pass their words in `user_confirmation`. Annotated
+destructive. Returns `{proposal_id, state: "accepted", rules_applied, mode_changed, rules,
+manage_url}`; it appears in the Privacy page's history.
 
 ## Prompts
 
 | Prompt | What it does |
 |---|---|
 | `catch_me_up` | `catch_up`, then `get_mentions`; a summary by chat, most urgent first; no drafts unless asked |
-| `draft_replies` | Finds what needs a reply, drafts in the user's tone, shows drafts first, requests approval only for confirmed ones |
-| `classify_chats_for_privacy` | Sorts chats into work, personal, family, sensitive; asks what assistants may see; calls `propose_privacy_rules` once |
+| `draft_replies` | Finds what needs a reply, writes replies in the user's tone; for each one the user wants: `draft_reply`, show it, `send_reply` after the user's yes |
+| `classify_chats_for_privacy` | Sorts chats into work, personal, family, sensitive; asks what assistants may see; shows the exact changes and calls `apply_privacy_rules` after the user's yes |
 
 ## Errors
 
@@ -193,13 +185,14 @@ on the website's Privacy page.
 |---|---|
 | `Telegram is not connected. …` / `WhatsApp is not connected. Ask the user to open <url> and scan the QR code…` | Show the (sensitive) link to the user only; wait for them; `connection_status`; retry once |
 | `This chat is hidden by the user's privacy settings. It cannot be read, searched or replied to.` | Respect it: do not look for it another way or guess its contents |
-| `Rate limit: at most 30 Social Connect calls per minute. Wait a minute, then continue.` | Stop, wait a minute, retry once; use fewer, broader calls (`catch_up`) |
+| `Rate limit: at most 30 BotChatter calls per minute. Wait a minute, then continue.` | Stop, wait a minute, retry once; use fewer, broader calls (`catch_up`) |
 | `Telegram is rate-limiting this account. Try again in N seconds/minutes/hours.` | Flood wait: stop, tell the user, retry once after N |
 | `The Telegram session has ended. Connect again to continue.` | `connect_account` for a fresh link |
 | `Could not reach Telegram. Please try again.` | Transient: retry once after a few seconds |
 | HTTP 401 on `/mcp` | Sign-in expired or revoked: sign in again |
-| `This assistant app can't show approval forms (MCP elicitation), …` | `request_reply_approval` and `propose_privacy_rules` only: nothing was sent, drafted or changed. Tell the user to use an app that supports approval forms (Grok Bot, Cursor) |
-| `Sending replies needs the Plus plan. …` | Nothing was drafted or sent; pass on the upgrade link |
+| `Sending messages needs the Pro plan. …` | Nothing was drafted or sent; pass on the upgrade link |
+| `Nothing was sent: …` (from `send_reply`) | The draft was unknown, already sent, failed, expired or withdrawn, or the plan changed: tell the user; draft again only if they still want to send |
+| `… is paused: the user's plan reads fewer accounts …` | Pass on the upgrade link; do not retry |
 | `invalid_grant`: `Encryption keys changed; connect this assistant again.` (token refresh) | The account's key was reset and the grant revoked: sign in again (`/mcp`; an agent runs `signup` and `authorize` again with its recovery code) |
 
 A `chat_ref` from another account, or an edited one, is rejected: always use the value a tool

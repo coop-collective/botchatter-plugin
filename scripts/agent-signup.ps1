@@ -1,5 +1,5 @@
 <#
-Social Connect agent sign-up for Windows (PowerShell 5.1 or 7). The same commands and output as
+BotChatter agent sign-up for Windows (PowerShell 5.1 or 7). The same commands and output as
 agent-signup.sh (which Git for Windows' bash and WSL also run):
 
   agent-signup.ps1 describe
@@ -12,14 +12,14 @@ agent-signup.sh (which Git for Windows' bash and WSL also run):
   agent-signup.ps1 logout
   agent-signup.ps1 host [URL | -Reset]
 
-An autonomous agent with its own mailbox creates and owns a Social Connect account without a
+An autonomous agent with its own mailbox creates and owns a BotChatter account without a
 browser, then hands its human a link to connect Telegram. Secrets (the emailed code, the PKCE
 verifier, access and refresh tokens, the account's recovery code) are never printed. On Windows
 they are kept in files encrypted for the current Windows user (DPAPI) under
 %APPDATA%\social-connect; elsewhere in mode-600 files, and the script says where. The recovery
 code is returned once, when the account's encryption key is created; later authorize runs for
 that account send it automatically, and logout keeps it. Settings: SOCIAL_CONNECT_WEB (else the
-host saved with `host URL`, else https://staging.cooposio.com) and SOCIAL_CONNECT_RECOVERY_CODE
+host saved with `host URL`, else https://staging.botchatter.ai) and SOCIAL_CONNECT_RECOVERY_CODE
 (a recovery code saved elsewhere), as for the sh script.
 #>
 param(
@@ -35,7 +35,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Net.Http
 
-$DefaultWeb = 'https://staging.cooposio.com'
+$DefaultWeb = 'https://staging.botchatter.ai'
 $RedirectUri = 'http://127.0.0.1:8976/callback'
 $ConfigRoot = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } elseif ($env:APPDATA) { $env:APPDATA } else { Join-Path $HOME '.config' }
 $ConfigDir = Join-Path $ConfigRoot 'social-connect'
@@ -49,7 +49,7 @@ else { $Web = $DefaultWeb; $WebSource = 'default' }
 $Web = $Web.TrimEnd('/')
 
 function Say([string]$Text) { Write-Output $Text }
-function Fail([string]$Text) { [Console]::Error.WriteLine("social-connect: $Text"); exit 1 }
+function Fail([string]$Text) { [Console]::Error.WriteLine("botchatter: $Text"); exit 1 }
 
 function Set-Host([string]$Url) {
   $script:Web = $Url.TrimEnd('/')
@@ -151,7 +151,7 @@ function Cmd-Describe {
 
 function Cmd-Signup([string]$Address) {
   if ($Address -notmatch '^[^@\s"\\]+@[^@\s"\\]+\.[^@\s"\\]+$') { Fail 'signup: pass the agent''s own email address' }
-  $clientName = if ($AgentName) { $AgentName } else { 'Social Connect agent' }
+  $clientName = if ($AgentName) { $AgentName } else { 'BotChatter agent' }
   $reg = Send 'POST' "$Web/oauth/register" (@{
       client_name = $clientName; redirect_uris = @($RedirectUri); grant_types = @('authorization_code', 'refresh_token')
       response_types = @('code'); token_endpoint_auth_method = 'none'
@@ -262,7 +262,7 @@ function Invoke-Tool([string]$Name, [string]$ArgsJson) {
   if (-not $ArgsJson) { $ArgsJson = '{}' }
   Load-Tokens
   $script:McpSession = $null
-  $init = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"social-connect-agent-signup","version":"0.1.0"}}}'
+  $init = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"botchatter-agent-signup","version":"0.1.0"}}}'
   $res = Mcp $init
   if ($res.Status -eq 401) {
     $script:RefreshError = ''
@@ -293,7 +293,7 @@ function Cmd-Connect {
 }
 
 function Cmd-Call([string]$Tool, [string]$ArgsJson) {
-  if (-not $Tool) { Fail 'call: name a tool (for example catch_up, get_mentions, find_chats, read_recent_messages, list_reply_requests; all 17 are in skills/social-connect/references/mcp-tools.md)' }
+  if (-not $Tool) { Fail 'call: name a tool (for example catch_up, get_mentions, find_chats, read_recent_messages, draft_reply; all 23 are in skills/botchatter/references/mcp-tools.md)' }
   if ($Tool -notmatch '^[a-z_]+$') { Fail "call: not a tool name: $Tool" }
   $out = Invoke-Tool $Tool $ArgsJson
   Say $out
@@ -305,15 +305,15 @@ function Cmd-Host([string]$Url) {
     Remove-Item -Force -ErrorAction SilentlyContinue $HostFile
     Say "host: forgotten; $DefaultWeb from now on"
     Say "mcp_url: $DefaultWeb/mcp"
-    Say "claude_code: printf '%s' '{`"mcp_url`":`"$DefaultWeb/mcp`"}' | claude plugin configure social-connect@social-connect --values-stdin"
+    Say "claude_code: printf '%s' '{`"mcp_url`":`"$DefaultWeb/mcp`"}' | claude plugin configure botchatter@botchatter --values-stdin"
     return
   }
   if (-not $Url) { Say "web: $Web ($WebSource)"; Say "mcp_url: $McpUrl"; return }
-  if ($Url -notmatch '^https?://') { Fail 'host: pass a URL like https://staging.cooposio.com or http://localhost:8787, or -Reset' }
+  if ($Url -notmatch '^https?://') { Fail 'host: pass a URL like https://staging.botchatter.ai or http://localhost:8787, or -Reset' }
   Set-Host $Url
   $meta = Send 'GET' "$Web/.well-known/oauth-protected-resource/mcp"
   $resource = if ($meta.Status -eq 200) { (Parse $meta.Body).resource } else { $null }
-  if (-not $resource) { Fail "cannot reach $Web/.well-known/oauth-protected-resource/mcp (is it a Social Connect host?)" }
+  if (-not $resource) { Fail "cannot reach $Web/.well-known/oauth-protected-resource/mcp (is it a BotChatter host?)" }
   Ensure-ConfigDir
   if ($Web -eq $DefaultWeb) {
     Remove-Item -Force -ErrorAction SilentlyContinue $HostFile
@@ -323,8 +323,8 @@ function Cmd-Host([string]$Url) {
     Say "host: saved $Web in $HostFile"
   }
   Say "mcp_url: $resource"
-  Say "claude_code: printf '%s' '{`"mcp_url`":`"$resource`"}' | claude plugin configure social-connect@social-connect --values-stdin"
-  Say "codex: codex mcp add social-connect-custom --url $resource"
+  Say "claude_code: printf '%s' '{`"mcp_url`":`"$resource`"}' | claude plugin configure botchatter@botchatter --values-stdin"
+  Say "codex: codex mcp add botchatter-custom --url $resource"
   if ($env:SOCIAL_CONNECT_WEB -and $env:SOCIAL_CONNECT_WEB.TrimEnd('/') -ne $Web) { Say "note: SOCIAL_CONNECT_WEB=$($env:SOCIAL_CONNECT_WEB) is set and still wins in this shell" }
 }
 

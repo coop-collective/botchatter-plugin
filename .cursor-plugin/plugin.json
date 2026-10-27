@@ -1,13 +1,13 @@
 {
-  "name": "social-connect",
+  "name": "botchatter",
   "version": "0.3.0",
-  "description": "Read, search and catch up on your own Telegram and WhatsApp in Grok Bot or Cursor, connect by scanning a QR code right in the chat, and draft replies that are sent only after you approve each one in a form in the chat.",
+  "description": "Read, search and catch up on your own Telegram and WhatsApp in Grok Bot or Cursor, connect by scanning a QR code right in the chat, and draft replies that are sent only after you confirm each one in the chat.",
   "author": {
-    "name": "Social Connect",
-    "email": "support@cooposio.com"
+    "name": "BotChatter",
+    "email": "support@botchatter.ai"
   },
-  "homepage": "https://staging.cooposio.com",
-  "repository": "https://github.com/coop-collective/social-connect-plugin",
+  "homepage": "https://staging.botchatter.ai",
+  "repository": "https://github.com/coop-collective/botchatter-plugin",
   "license": "MIT",
   "keywords": [
     "telegram",

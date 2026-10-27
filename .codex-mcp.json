@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "social-connect": {
+    "botchatter": {
       "type": "http",
-      "url": "https://staging.cooposio.com/mcp"
+      "url": "https://staging.botchatter.ai/mcp"
     }
   }
 }

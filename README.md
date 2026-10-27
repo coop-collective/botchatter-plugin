@@ -1,10 +1,10 @@
-# Social Connect plugin for Claude Code and Codex
+# BotChatter plugin for Claude Code and Codex
 
-Social Connect lets your AI assistant read your own Telegram and personal WhatsApp chats and
-propose replies that you approve yourself. It is a hosted remote MCP server: you sign in with an
+BotChatter lets your AI assistant read your own Telegram and personal WhatsApp chats and
+send replies you confirm yourself. It is a hosted remote MCP server: you sign in with an
 email code, connect Telegram or WhatsApp by scanning a QR code, and then ask your assistant to catch you
-up, find a chat or draft a reply. A reply is sent only after you approve it in a form your
-assistant app shows in the chat, and then exactly once; reads never mark your messages as read,
+up, find a chat or draft a reply. Your assistant drafts a reply, shows you the chat and the exact
+text, and sends that exact draft only after you say yes in the chat, and then exactly once; reads never mark your messages as read,
 and you choose which chats assistants can see. Your messages, contacts and
 connection credentials are encrypted with a key that only you, and the AI apps you connect, can
 unlock; we don't keep that key. We connect to WhatsApp only while you're using your assistant;
@@ -22,29 +22,29 @@ an autonomous agent with its own mailbox can sign itself up.
 **Claude Code**
 
 ```bash
-claude plugin marketplace add coop-collective/social-connect-plugin
-claude plugin install social-connect@social-connect
+claude plugin marketplace add coop-collective/botchatter-plugin
+claude plugin install botchatter@botchatter
 ```
 
 **Codex**
 
 ```bash
-codex plugin marketplace add coop-collective/social-connect-plugin
-codex plugin add social-connect@social-connect
+codex plugin marketplace add coop-collective/botchatter-plugin
+codex plugin add botchatter@botchatter
 ```
 
-**Updating.** Claude Code: `claude plugin marketplace update social-connect`, then
-`claude plugin update social-connect@social-connect`. Codex: `codex plugin marketplace upgrade
-social-connect`, then `codex plugin add social-connect@social-connect`.
+**Updating.** Claude Code: `claude plugin marketplace update botchatter`, then
+`claude plugin update botchatter@botchatter`. Codex: `codex plugin marketplace upgrade
+botchatter`, then `codex plugin add botchatter@botchatter`.
 
 ## Sign in and connect Telegram or WhatsApp
 
-The plugin registers one MCP server, `social-connect`, at `https://staging.cooposio.com/mcp` over
+The plugin registers one MCP server, `botchatter`, at `https://staging.botchatter.ai/mcp` over
 HTTP with OAuth (no header, no token in a file). Sign in once:
 
 ```bash
-claude mcp login plugin:social-connect:social-connect   # or /mcp inside a session
-codex mcp login social-connect                          # Codex keeps the credential in the OS keychain
+claude mcp login plugin:botchatter:botchatter   # or /mcp inside a session
+codex mcp login botchatter                          # Codex keeps the credential in the OS keychain
 ```
 
 A browser tab opens: enter your email and the 6-digit code it sends you, then approve the
@@ -52,9 +52,9 @@ assistant. The first time, it shows a recovery code once: save it in a password 
 unlocks your data in a new browser). If no Telegram account is connected yet, the button reads **Allow and connect
 Telegram**: read the disclosure, then scan the QR code with Telegram on your phone
 (**Settings → Devices → Link Desktop Device**), or tap the `tg://` link if you are on the phone.
-The browser then returns you to your assistant. Skipped it? Run `/social-connect:connect`.
+The browser then returns you to your assistant. Skipped it? Run `/botchatter:connect`.
 
-**WhatsApp (beta):** `/social-connect:connect whatsapp` (or "Allow and connect WhatsApp" when
+**WhatsApp (beta):** `/botchatter:connect whatsapp` (or "Allow and connect WhatsApp" when
 signing in). Open the link on a computer or a second screen, not on your phone, then in
 WhatsApp on the phone go to **Settings → Linked devices → Link a device** and scan the QR code.
 WhatsApp only has the messages that arrived while it was connected, so older history may be
@@ -67,10 +67,10 @@ keep it to yourself.
 
 | Piece | What it does |
 |---|---|
-| Skill `social-connect` | Loaded when you ask about your Telegram or WhatsApp messages, connecting an account, or Social Connect: the tools, the sign-in and connect flow, agent sign-up, and etiquette (ask first, at most 20 chats and 30 messages per call, summarize rather than dump, never pressure you to approve, give the connect link when not connected, wait out rate limits). |
-| `/social-connect:connect [telegram\|whatsapp]` | Gets a 30-minute connect link from the MCP server and shows it to you only, with the QR steps. |
-| `/social-connect:host <url>` | Uses a custom host (self-hosted, local or staging) for the MCP server and agent sign-up, saved across sessions; `--reset` goes back to the default. |
-| `.mcp.json` | The `social-connect` MCP server (HTTP, OAuth) at the plugin's `mcp_url` option (default `https://staging.cooposio.com/mcp`). Codex reads `.codex-plugin/plugin.json` and the literal `.codex-mcp.json` instead. |
+| Skill `botchatter` | Loaded when you ask about your Telegram or WhatsApp messages, connecting an account, or BotChatter: the tools, the sign-in and connect flow, agent sign-up, and etiquette (ask first, at most 20 chats and 30 messages per call, summarize rather than dump, never pressure you to approve, give the connect link when not connected, wait out rate limits). |
+| `/botchatter:connect [telegram\|whatsapp]` | Gets a 30-minute connect link from the MCP server and shows it to you only, with the QR steps. |
+| `/botchatter:host <url>` | Uses a custom host (self-hosted, local or staging) for the MCP server and agent sign-up, saved across sessions; `--reset` goes back to the default. |
+| `.mcp.json` | The `botchatter` MCP server (HTTP, OAuth) at the plugin's `mcp_url` option (default `https://staging.botchatter.ai/mcp`). Codex reads `.codex-plugin/plugin.json` and the literal `.codex-mcp.json` instead. |
 | `scripts/agent-signup.sh`, `.ps1` | Headless sign-up for an autonomous agent with its own mailbox (below). |
 | `AGENTS-snippet.md` | The same guidance, compact, to paste into an `AGENTS.md` for agents without plugins (Cursor, Copilot, Gemini CLI). |
 
@@ -90,22 +90,22 @@ keep it to yourself.
 | `get_message_context({chat_ref, message_id})` | The conversation around one message |
 | `search_messages({query, provider?, chat_ref?, type?})` | Search all chats or one chat |
 | `get_media({chat_ref, message_id})` | Opens one photo, voice note or file (up to 5 MB); nothing is stored |
-| `request_reply_approval({chat_ref, text})` | Shows you an approval form in the chat with the exact text; you can edit it, then approve or decline. Approved, it is sent once, exactly as approved, and the result says `sent` (Plus plan) |
-| `list_reply_requests({state?})` | What happened to requested replies: pending, sending, sent, failed (maybe `ambiguous`), rejected, withdrawn |
-| `cancel_reply_request({approval_id})` | Withdraws a pending reply request |
+| `draft_reply({chat_ref, text})` | Queues one reply and sends nothing; returns a `draft_id` (valid 15 minutes). Your assistant shows you the chat and exact text and asks you to confirm |
+| `send_reply({draft_id, user_confirmation})` | After you say yes, sends exactly that draft, once; the result says `sent` (Pro plan). Your app may ask you to allow the call too |
 | `get_privacy_settings()` | Your blocklist or allowlist mode and how many rules exist |
-| `propose_privacy_rules({mode?, rules})` | Shows the proposed rules in a form in the chat; nothing changes unless you accept |
+| `apply_privacy_rules({mode?, rules, user_confirmation})` | Hides or shows the chats you confirmed in the chat |
+| `start_connect`, `check_connect`, `connect_with_phone`, `submit_login_code`, `cancel_connect` | Connect an account right in the chat (QR image, or Telegram by phone) |
+| `get_web_sign_in_link()` | A one-time link that signs you in to the BotChatter website |
 
 MCP prompts: `catch_me_up`, `draft_replies`, `classify_chats_for_privacy`. Chats you hide are
-invisible to every connected assistant, and an assistant can only propose privacy rules.
-Apps that can't show approval forms (MCP form elicitation) can read but cannot send replies or
-change privacy rules; Grok Bot and Cursor support them. The Social Connect website's Activity
-page is a read-only record of every reply request and how it was decided.
+invisible to every connected assistant, and an assistant changes privacy rules only after you
+confirm the exact changes. All approval happens in your assistant's chat; the BotChatter
+website's Replies page is a read-only record of every reply and what happened.
 
 ## Agent sign-up (autonomous agents)
 
 An agent that has its own mailbox (Grok, a hosted bot, any autonomous agent) can create and own a
-Social Connect account without a browser, then give its human a link to connect Telegram:
+BotChatter account without a browser, then give its human a link to connect Telegram:
 
 ```bash
 sh scripts/agent-signup.sh signup agent@example.org --agent-name "Example Agent"
@@ -128,7 +128,7 @@ A recovery code saved elsewhere goes in `SOCIAL_CONNECT_RECOVERY_CODE`. `scripts
 twin; on Windows it keeps the token and recovery code in files encrypted for the current user
 (DPAPI). The raw
 HTTP steps are in
-[skills/social-connect/references/agent-signup.md](skills/social-connect/references/agent-signup.md).
+[skills/botchatter/references/agent-signup.md](skills/botchatter/references/agent-signup.md).
 
 Only accounts created this way can sign in through it; an address that belongs to an account a
 person made in the browser is refused (409).
@@ -136,22 +136,22 @@ person made in the browser is refused (409).
 ## Custom host (self-hosted, local, staging)
 
 ```bash
-/social-connect:host https://social-connect.example.org   # in Claude Code; --reset goes back
+/botchatter:host https://botchatter.example.org   # in Claude Code; --reset goes back
 ```
 
 It runs `agent-signup.sh host <url>`, which checks `<url>/.well-known/oauth-protected-resource/mcp`,
 saves the host in `~/.config/social-connect/host` (`$XDG_CONFIG_HOME`; `%APPDATA%` on Windows)
-and prints a `claude plugin configure social-connect@social-connect --values-stdin` line that sets
+and prints a `claude plugin configure botchatter@botchatter --values-stdin` line that sets
 the plugin's `mcp_url`. Restart Claude Code and sign in with `/mcp`. `SOCIAL_CONNECT_WEB=<url>`
 overrides the host for one run. Codex substitutes neither `${VAR}` nor `${user_config.*}` in a
 plugin's MCP file, so it gets its own manifest with a literal URL; for another host add one by
-hand (`codex mcp add social-connect-custom --url <url>`).
+hand (`codex mcp add botchatter-custom --url <url>`).
 
 ## Without a plugin
 
 - **Claude (claude.ai, Desktop):** Settings → Connectors → Add custom connector → paste the MCP URL.
-- **Another MCP client:** `claude mcp add --transport http social-connect <url>` or
-  `codex mcp add social-connect --url <url>`, and paste `AGENTS-snippet.md` into `AGENTS.md`.
+- **Another MCP client:** `claude mcp add --transport http botchatter <url>` or
+  `codex mcp add botchatter --url <url>`, and paste `AGENTS-snippet.md` into `AGENTS.md`.
 
 ## Development
 
@@ -163,12 +163,12 @@ sh test/script-tests.sh        # manifests agree, shellcheck, offline checks of 
 
 | Path | What |
 |---|---|
-| `.claude-plugin/marketplace.json` | The marketplace (one plugin, `social-connect`, at the repository root); Claude Code and Codex both read it |
+| `.claude-plugin/marketplace.json` | The marketplace (one plugin, `botchatter`, at the repository root); Claude Code and Codex both read it |
 | `.claude-plugin/plugin.json` | Plugin manifest for Claude Code (with the `mcp_url` option) |
 | `.codex-plugin/plugin.json`, `.codex-mcp.json` | Codex's manifest (same metadata and version) and its MCP server at a literal URL |
 | `.mcp.json` | MCP server for Claude Code (`${user_config.mcp_url}`) |
-| `commands/` | `/social-connect:connect`, `/social-connect:host` |
-| `skills/social-connect/` | `SKILL.md` plus `references/` (MCP tools, agent sign-up) |
+| `commands/` | `/botchatter:connect`, `/botchatter:host` |
+| `skills/botchatter/` | `SKILL.md` plus `references/` (MCP tools, agent sign-up) |
 | `scripts/` | `agent-signup.sh` and its PowerShell twin |
 | `test/` | Script and manifest checks |
 
@@ -176,12 +176,12 @@ sh test/script-tests.sh        # manifests agree, shellcheck, offline checks of 
 
 | Feature | State |
 |---|---|
-| MCP OAuth (email code sign-in, DCR and CIMD), 17 tools and 3 prompts, 30 tool calls a minute per account | Staging (`https://staging.cooposio.com`) |
+| MCP OAuth (email code sign-in, DCR and CIMD), 22 tools and 3 prompts, 30 tool calls a minute per account | Staging (`https://staging.botchatter.ai`) |
 | User-keyed encryption at rest (recovery code, device unlock) | Built (connector HEAD); check staging is deployed |
 | Connect Telegram by QR inside the OAuth trip | Staging |
 | Agent sign-up (`/api/agent/*`, with the recovery code) | Built; check `GET <host>/api/agent/` answers JSON before relying on it |
-| Sending an approved reply (approved in a form in the chat; once, exactly as approved; ambiguous failures never retried; Plus plan) | Staging |
-| Privacy rules (blocklist or allowlist; assistants propose, the user accepts in a form in the chat) | Staging |
+| Sending a confirmed reply (`draft_reply`, the user confirms in the chat, `send_reply(draft_id)`; once, exactly as drafted; ambiguous failures never retried; Pro plan) | Staging |
+| Privacy rules (blocklist or allowlist; applied after the user confirms in the chat) | Staging |
 | Personal WhatsApp (connect by QR, merged chat list, partial-history `sync`) | **Beta**: built (connector HEAD), not yet tested against a real account |
 
 Update the skill, the snippet and this table when those change.
@@ -195,12 +195,12 @@ Update the skill, the snippet and this table when those change.
 This repository is also a Cursor plugin (`.cursor-plugin/plugin.json`, `mcp.json`, `assets/logo.svg`), which is the
 format Grok Bot uses for connectors.
 
-- **Grok Bot:** Connect apps → Add → custom MCP server `https://staging.cooposio.com/mcp`, then sign in with your email
-  code and approve. In chat, say "connect my Telegram" (or WhatsApp): Social Connect shows the risks, then a QR code right
+- **Grok Bot:** Connect apps → Add → custom MCP server `https://staging.botchatter.ai/mcp`, then sign in with your email
+  code and approve. In chat, say "connect my Telegram" (or WhatsApp): BotChatter shows the risks, then a QR code right
   in the chat to scan from your phone (Telegram: Settings → Devices → Link Desktop Device; WhatsApp: Settings → Linked
   devices). Telegram can also connect with your phone number and login code. If anything needs a browser (Telegram
   two-step password), you get a link.
-- **Cursor:** add `{"mcpServers":{"social-connect":{"url":"https://staging.cooposio.com/mcp"}}}` to `~/.cursor/mcp.json`,
+- **Cursor:** add `{"mcpServers":{"botchatter":{"url":"https://staging.botchatter.ai/mcp"}}}` to `~/.cursor/mcp.json`,
   or install this repo as a plugin.
-- The connector uses OAuth (no tokens in this repo). Privacy policy: https://staging.cooposio.com/privacy-policy ·
-  Terms: https://staging.cooposio.com/terms
+- The connector uses OAuth (no tokens in this repo). Privacy policy: https://staging.botchatter.ai/privacy-policy ·
+  Terms: https://staging.botchatter.ai/terms

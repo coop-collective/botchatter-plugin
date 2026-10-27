@@ -1,19 +1,19 @@
 {
-  "name": "social-connect",
+  "name": "botchatter",
   "owner": {
-    "name": "Social Connect"
+    "name": "BotChatter"
   },
   "metadata": {
-    "description": "Social Connect's plugin for Claude Code and Codex: read your own Telegram and WhatsApp chats from your assistant through the Social Connect MCP server, with human approval for every reply."
+    "description": "BotChatter's plugin for Claude Code and Codex: read your own Telegram and WhatsApp chats from your assistant through the BotChatter MCP server, with human approval for every reply."
   },
   "plugins": [
     {
-      "name": "social-connect",
+      "name": "botchatter",
       "source": "./",
-      "description": "Read your own Telegram and personal WhatsApp (beta) chats from your assistant: catch up, search, find chats and people, and propose replies sent only after you approve them in a form in the chat. Includes agent sign-up for autonomous agents.",
+      "description": "Read your own Telegram and personal WhatsApp (beta) chats from your assistant: catch up, search, find chats and people, and draft replies sent only after you confirm them in the chat. Includes agent sign-up for autonomous agents.",
       "category": "productivity",
       "keywords": [
-        "social-connect",
+        "botchatter",
         "telegram",
         "whatsapp",
         "messaging",

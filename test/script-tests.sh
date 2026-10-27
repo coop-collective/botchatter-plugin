@@ -11,12 +11,12 @@ for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugi
 done
 ok "JSON files parse"
 
-default=https://staging.cooposio.com/mcp
+default=https://staging.botchatter.ai/mcp
 # shellcheck disable=SC2016 # the literal placeholder Claude Code substitutes
-[ "$(jq -r '.mcpServers["social-connect"].url' .mcp.json)" = '${user_config.mcp_url}' ] || fail ".mcp.json must use the mcp_url option"
+[ "$(jq -r '.mcpServers["botchatter"].url' .mcp.json)" = '${user_config.mcp_url}' ] || fail ".mcp.json must use the mcp_url option"
 [ "$(jq -r '.userConfig.mcp_url.default' .claude-plugin/plugin.json)" = "$default" ] || fail "mcp_url default"
 [ "$(jq -r '.mcpServers' .codex-plugin/plugin.json)" = ./.codex-mcp.json ] || fail "codex manifest must point at .codex-mcp.json"
-[ "$(jq -r '.mcpServers["social-connect"].url' .codex-mcp.json)" = "$default" ] || fail "codex MCP url must be literal"
+[ "$(jq -r '.mcpServers["botchatter"].url' .codex-mcp.json)" = "$default" ] || fail "codex MCP url must be literal"
 for k in name version description license; do
   [ "$(jq -r ".$k" .claude-plugin/plugin.json)" = "$(jq -r ".$k" .codex-plugin/plugin.json)" ] || fail "manifests disagree on $k"
 done
