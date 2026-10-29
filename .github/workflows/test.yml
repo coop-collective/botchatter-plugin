@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,16 +15,24 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    # Only main opts into the pilot; unset/false restores GitHub-hosted Linux.
+    runs-on: ${{ vars.ENGINEBOX_CI_ENABLED == 'true' && github.ref == 'refs/heads/main' && matrix.os == 'ubuntu-latest' && fromJSON('["self-hosted", "Linux", "X64", "enginebox-linux"]') || matrix.os }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Install shellcheck (macOS)
         if: runner.os == 'macOS'
         run: brew install shellcheck
+      - name: Install Linux test dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends jq shellcheck
       - run: sh test/script-tests.sh
 
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.ENGINEBOX_CI_ENABLED == 'true' && github.ref == 'refs/heads/main' && fromJSON('["self-hosted", "Linux", "X64", "enginebox-linux"]') || 'ubuntu-latest' }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
