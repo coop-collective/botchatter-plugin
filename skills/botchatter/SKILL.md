@@ -56,8 +56,14 @@ When an account isn't connected, connect it right here instead of sending the us
 2. Call `start_connect({provider})` without `accept_risks`: it returns the risk disclosure. Show it, and only after the
    user explicitly agrees call it again with `accept_risks: true`.
 3. **QR:** show the image it returns and the instructions (Telegram: Settings → Devices → Link Desktop Device; WhatsApp:
-   Settings → Linked devices → Link a device, scanned from the phone). Call `check_connect` every few seconds; if it
-   returns a new QR image (codes rotate every ~20-30 s), show the new one. Stop when it says `connected`.
+   Settings → Linked devices → Link a device, scanned from the phone). Then poll `check_connect` about every 1.5 s
+   (`check_connect` is not rate limited, so poll freely until the connection resolves) and act on its `status`:
+   - `waiting` — not scanned yet; if it returns a new QR image (codes rotate every ~20-30 s), show the new one and keep polling.
+   - `needs_password` — **Telegram two-step verification, and it appears _after_ the QR has been scanned on an account that
+     has a cloud password.** The scan worked; the account just has 2FA. **Never ask for or accept that password in chat**
+     (it must not pass through the assistant). Give the user the `browser_url` it returns to open, tell them to enter their
+     Telegram password there, then keep polling `check_connect` until it says `connected`.
+   - `connected` — done.
 4. **Phone (Telegram):** `connect_with_phone({phone})`, then ask for the login code and call `submit_login_code`. Tell the
    user first: Telegram says never to share login codes, and typing it here means the assistant provider sees it; offer QR
    instead. If it returns `needs_password`, give the browser link it returns: **never ask for or accept the user's
