@@ -95,12 +95,18 @@ keep it to yourself.
 | `get_privacy_settings()` | Your blocklist or allowlist mode and how many rules exist |
 | `apply_privacy_rules({mode?, rules, user_confirmation})` | Hides or shows the chats you confirmed in the chat |
 | `start_connect`, `check_connect`, `connect_with_phone`, `submit_login_code`, `cancel_connect` | Connect an account right in the chat (QR image, or Telegram by phone) |
-| `get_web_sign_in_link()` | A one-time link that signs you in to the BotChatter website |
+| `get_web_sign_in_link({page?})` | A one-click link that opens your authenticated account without another email or sign-in step; use `page:"settings"` for reply permissions |
 
 MCP prompts: `catch_me_up`, `draft_replies`, `classify_chats_for_privacy`. Chats you hide are
 invisible to every connected assistant, and an assistant changes privacy rules only after you
 confirm the exact changes. All approval happens in your assistant's chat; the BotChatter
 website's Replies page is a read-only record of every reply and what happened.
+
+To let your assistant send confirmed replies, ask it to open BotChatter settings. It returns
+a one-click account link, including when the account uses its Grok Bot email. Under
+**Settings → Reply permissions**, turn on **Let my assistant app approve sends** and select
+**Save reply permissions**. Your assistant app must ask before each send, and you still
+confirm each exact draft in the chat.
 
 ## Agent sign-up (autonomous agents)
 
@@ -176,7 +182,7 @@ sh test/script-tests.sh        # manifests agree, shellcheck, offline checks of 
 
 | Feature | State |
 |---|---|
-| MCP OAuth (email code sign-in, DCR and CIMD), 22 tools and 3 prompts, 30 tool calls a minute per account | Staging (`https://staging.botchatter.ai`) |
+| MCP OAuth (email code sign-in, DCR and CIMD), 29 tools and 3 prompts, 30 tool calls a minute per account | Staging (`https://staging.botchatter.ai`) |
 | User-keyed encryption at rest (recovery code, device unlock) | Built (connector HEAD); check staging is deployed |
 | Connect Telegram by QR inside the OAuth trip | Staging |
 | Agent sign-up (`/api/agent/*`, with the recovery code) | Built; check `GET <host>/api/agent/` answers JSON before relying on it |

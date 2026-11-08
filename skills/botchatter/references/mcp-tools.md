@@ -22,6 +22,19 @@ fails with the hidden-chat error below.
 
 ## Accounts
 
+### get_web_sign_in_link({page?})
+
+`page` is `"accounts"` (default) or `"settings"`. Returns
+`{status:"ok", sign_in_url, expires_in_seconds:900}`. Call immediately when the user asks to
+open BotChatter, their account, dashboard or settings. The MCP credential already identifies
+the account, including a Grok Bot email account. No browser login, email code or sign-up is
+needed. Give the private link directly to the user; it opens the account automatically,
+works once for 15 minutes, and must never be opened by the assistant.
+
+For disabled sending, use `page:"settings"`. The user enables **Let my assistant app approve
+sends** under **Reply permissions** and selects **Save reply permissions**. Each reply still
+needs confirmation in the assistant app. The website cannot send a draft.
+
 ### connection_status()
 
 ```json
@@ -170,6 +183,54 @@ Applies the rules (and the mode) at once, only after the user saw the exact list
 changes in the chat and explicitly said yes; pass their words in `user_confirmation`. Annotated
 destructive. Returns `{proposal_id, state: "accepted", rules_applied, mode_changed, rules,
 manage_url}`; it appears in the Privacy page's history.
+
+## Folders (Telegram)
+
+Folder changes run only after the user's explicit yes in the chat, and only when **Let my assistant app approve
+sends** is on (the same gate as sending). Chats the user hid never appear in a folder's results and cannot be
+added or removed. WhatsApp has no folders a linked device can read.
+
+### list_folders({ provider = "telegram", account?, query? })
+
+`{ supported: true, folders: [{ folder_ref, title, shared, emoji, chosen_chats, includes_all, excludes, account? }] }`.
+`query` matches folder names (case-insensitive). `includes_all` lists the chat kinds the folder takes in by rule:
+`contacts`, `non_contacts`, `groups`, `channels`, `bots`. `shared` folders were joined from an invite link, and
+their chats can only be changed in Telegram. With `provider: "whatsapp"`: `{ supported: false, folders: [], note }`.
+
+### list_folder_chats({ folder_ref, limit: 1..50 = 20 })
+
+`{ folder, chats: ChatSummary[], truncated }`: the folder's chats as Telegram computes them, newest activity
+first.
+
+### read_folder_messages({ folder_ref, max_chats: 1..20 = 10, per_chat: 1..10 = 5 })
+
+`{ folder, chats: [{ provider, chat, messages }], truncated }`.
+
+### watch_messages({ folder_ref | chat_ref, cursor?, max_chats: 1..20 = 10, per_chat: 1..10 = 5 })
+
+Pass exactly one of `folder_ref` and `chat_ref`. Returns `{ chats: [{ chat, messages }], new_messages, cursor,
+coverage, folder? }`. Only messages newer than `cursor` are returned; without a cursor you get the current newest
+window. Store the new `cursor` for the next run. A cursor is bound to this user and this folder or chat, and it
+lasts 7 days. A foreign, edited or expired cursor fails with "This cursor is not valid…": start again without one.
+Each run sees at most `per_chat` messages per chat, so poll often enough.
+
+### create_folder({ title: 1..12 chars, chat_refs: [] , account?, user_confirmation })
+
+`{ created: true, folder }`. All chats must be Telegram chats of one account. A duplicate name is refused.
+
+### update_folder({ folder_ref, title?, add_chat_refs?, remove_chat_refs?, user_confirmation })
+
+`{ updated: true, folder }`. A removed chat leaves the folder only; if it was in by a rule (e.g. "all groups"),
+it is excluded instead.
+
+### delete_folder({ folder_ref, confirm_token?, user_confirmation? })
+
+1. **Without `confirm_token`:** deletes nothing. Returns `{ deleted: false, folder, chats_in_folder, confirm_token,
+   next }`. The token lasts 10 minutes.
+2. **With `confirm_token` and `user_confirmation`,** after the user said yes: `{ deleted: true, title }`.
+
+No chat or message is ever deleted. A token for another folder or user, or an expired one, is refused with
+"Nothing was deleted: …".
 
 ## Prompts
 

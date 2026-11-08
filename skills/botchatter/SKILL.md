@@ -1,6 +1,6 @@
 ---
 name: botchatter
-description: Read the user's own Telegram and personal WhatsApp chats (WhatsApp in beta) through the BotChatter MCP server, and send replies only after the user confirms each one in the chat (draft_reply, then send_reply). Use when the user asks to catch up on, summarize, triage or search their Telegram or WhatsApp messages, find a chat, contact or mention, open a photo or file from a chat, draft or follow up on a reply, choose which chats assistants may see (privacy rules), connect Telegram or WhatsApp to their assistant, sign in to BotChatter, or when an autonomous agent with its own mailbox needs a BotChatter account (agent sign-up). Also use on a BotChatter tool error (not connected, rate-limited, unauthorized). Not for sending messages directly, bulk messaging, or other people's accounts.
+description: Read the user's own Telegram and personal WhatsApp chats (WhatsApp in beta) through the BotChatter MCP server, and send replies only after the user confirms each one in the chat (draft_reply, then send_reply). Use when the user asks to catch up on, summarize, triage or search their Telegram or WhatsApp messages, find a chat, contact or mention, read, watch or organize Telegram folders (including recurring checks of a folder or group for new messages), open a photo or file from a chat, draft or follow up on a reply, choose which chats assistants may see (privacy rules), connect Telegram or WhatsApp to their assistant, sign in to BotChatter, or when an autonomous agent with its own mailbox needs a BotChatter account (agent sign-up). Also use on a BotChatter tool error (not connected, rate-limited, unauthorized). Not for sending messages directly, bulk messaging, or other people's accounts.
 ---
 
 # BotChatter
@@ -12,11 +12,11 @@ sends exactly that draft, once. **WhatsApp is beta**: it has not yet been tested
 account, so say so when the user connects it or relies on it. Default host: `https://staging.botchatter.ai` (MCP at `/mcp`); a custom
 host is set with `/botchatter:host <url>`.
 
-## Tools (server `botchatter`, 22)
+## Tools (server `botchatter`, 29)
 
 | Need | Tool |
 |---|---|
-| Is anything connected? | `connection_status()`: call first |
+| Is anything connected? | `connection_status()`: call first for connecting or reading chats |
 | Connect an account **in the chat** (preferred) | `start_connect({provider, method:"qr"\|"phone", accept_risks})` → QR image to scan; `check_connect({provider})` until connected (shows a fresh QR when it rotates); Telegram by phone: `connect_with_phone({phone})` then `submit_login_code({code})`; `cancel_connect` |
 | Connect an account in a browser (fallback) | `connect_account({provider})` → `connect_url` for the human (sensitive) |
 | What's new? | **`catch_up({provider?, since?, max_chats ≤ 20, per_chat ≤ 10})`**: one call, chats with activity since the last catch_up, each with its latest messages |
@@ -29,14 +29,35 @@ host is set with `/botchatter:host <url>`.
 | Around one message | `get_message_context({chat_ref, message_id, before ≤ 15, after ≤ 15})` |
 | Search | `search_messages({query, provider?, chat_ref?, limit ≤ 20, type?})`: every word must match |
 | Open a photo or file | `get_media({chat_ref, message_id})`: up to 5 MB, nothing stored |
+| Telegram folders | `list_folders({query?, account?})` → `folder_ref`s (WhatsApp: `supported: false`); `list_folder_chats({folder_ref, limit ≤ 50})` filters chats by folder; `read_folder_messages({folder_ref, max_chats ≤ 20, per_chat ≤ 10})` |
+| Recurring check for new messages | `watch_messages({folder_ref \| chat_ref, cursor?, max_chats, per_chat})` → only messages new since `cursor`, plus the next `cursor` (7 days). Works on a folder or any chat, e.g. a WhatsApp group |
+| Organize folders | `create_folder({title ≤ 12 chars, chat_refs, user_confirmation})`, `update_folder({folder_ref, title?, add_chat_refs?, remove_chat_refs?, user_confirmation})`, `delete_folder` (two steps, below); only after the user's yes |
 | Send a message (step 1) | `draft_reply({chat_ref, text})` → `{draft_id, chat_title, provider, text, expires_at, next}`; nothing is sent |
 | Send a message (step 2) | `send_reply({draft_id, user_confirmation})`: only after the user said yes to that draft; sends it once → state `sent` |
 | Privacy | `get_privacy_settings()`; `apply_privacy_rules({mode?, rules, user_confirmation})` after the user's yes |
-| The BotChatter website | `get_web_sign_in_link()` → a one-time sign-in link for the user |
+| Open BotChatter or the user's account | `get_web_sign_in_link()` → a one-click account link; call immediately, no separate sign-in |
+| Open reply permissions | `get_web_sign_in_link({page:"settings"})` → a one-click link to Settings → Reply permissions |
 
 MCP prompts (slash commands in clients that support them): `catch_me_up`, `draft_replies`,
 `classify_chats_for_privacy`. Full schemas, results and error texts:
 [references/mcp-tools.md](references/mcp-tools.md).
+
+## Opening BotChatter and enabling replies
+
+When the user asks to open BotChatter, their account, dashboard or settings, call
+`get_web_sign_in_link` immediately and give them the returned `sign_in_url`. The current MCP
+credential already identifies the account, including an account owned by the agent's Grok Bot
+email. Do not open a browser, visit the login page, look up an email code, repeat sign-up, or
+ask the user for a password. Opening the link signs them in automatically. It works once for
+15 minutes: give it only to the account's human in this private conversation; never open it
+yourself, post it publicly or save it in a file.
+
+If `send_reply` says **Let my assistant app approve sends** is off, nothing was sent. Call
+`get_web_sign_in_link({page:"settings"})` and give the user that link. They turn on the checkbox
+under **Settings → Reply permissions** and select **Save reply permissions**. Their assistant
+app must ask before every send; each exact draft still needs their confirmation. Do not
+change this setting yourself or retry sending before they enable it. The website's Replies
+page is a read-only record: never tell the user to send a draft from there.
 
 `chat_ref` is an opaque signed token bound to this user's account (`cr1.…` Telegram, `wr1.…`
 WhatsApp): pass it back unchanged, never invent or edit one. Say which app a chat is from when
@@ -182,6 +203,18 @@ yourself. If it may have leaked, say so and get a fresh one later rather than re
   never send it again automatically.** WhatsApp replies only go to chats where the other person
   has written first. Never pressure or hurry the person; one mention is enough. Sending needs
   the Pro plan: on Free, `draft_reply` refuses up front with an upgrade link; pass that on.
+- **Folders (Telegram).** Reading folders needs only the user's request. A recurring job ("check every new
+  message in my Clients folder and update the sheet") is `watch_messages`: keep the returned `cursor` and pass it
+  on the next run; each run returns only what is new. Nothing runs in the background, so schedule the calls in your
+  own app, often enough that no chat gets more than `per_chat` new messages between runs. Changing folders changes
+  the user's Telegram on every device, so show the exact change first (folder name, chats added or removed, by
+  name) and call `create_folder` / `update_folder` only after their own next message says yes, with their words in
+  `user_confirmation`. **Deleting is two calls:** `delete_folder({folder_ref})` deletes nothing and returns the
+  folder, its chats and a `confirm_token` (10 minutes). Ask "Delete the folder X? Its chats and messages stay."
+  Only after they say yes, call it again with `confirm_token` and `user_confirmation`. Removing a chat or deleting a
+  folder never deletes chats or messages. Folder changes also need **Let my assistant app approve sends**. If a
+  change is refused for that, handle it like sending: give the settings link and don't retry. WhatsApp has no
+  folders BotChatter can read; follow a WhatsApp group with `watch_messages({chat_ref})`.
 - **Hidden chats stay hidden.** The user can hide chats (blocklist) or show only some
   (allowlist). "This chat is hidden by the user's privacy settings" means exactly that: do not
   look for it another way (search, contacts, mentions, another provider), and do not guess its
