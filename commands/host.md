@@ -5,7 +5,7 @@ argument-hint: "<url> | --reset"
 
 Point this plugin's MCP server and the agent sign-up script at the BotChatter host in
 `$ARGUMENTS` (for example `https://staging.botchatter.ai` or `http://localhost:8787`), or back to
-the default `https://staging.botchatter.ai` with `--reset`. With no argument, show the current
+the default `https://botchatter.ai` with `--reset`. With no argument, show the current
 host and stop.
 
 Script: `sh "${CLAUDE_PLUGIN_ROOT}/scripts/agent-signup.sh"` (on Windows without Git Bash:

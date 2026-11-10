@@ -19,7 +19,7 @@ they are kept in files encrypted for the current Windows user (DPAPI) under
 %APPDATA%\social-connect; elsewhere in mode-600 files, and the script says where. The recovery
 code is returned once, when the account's encryption key is created; later authorize runs for
 that account send it automatically, and logout keeps it. Settings: SOCIAL_CONNECT_WEB (else the
-host saved with `host URL`, else https://staging.botchatter.ai) and SOCIAL_CONNECT_RECOVERY_CODE
+host saved with `host URL`, else https://botchatter.ai) and SOCIAL_CONNECT_RECOVERY_CODE
 (a recovery code saved elsewhere), as for the sh script.
 #>
 param(
@@ -35,7 +35,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Net.Http
 
-$DefaultWeb = 'https://staging.botchatter.ai'
+$DefaultWeb = 'https://botchatter.ai'
 $RedirectUri = 'http://127.0.0.1:8976/callback'
 $ConfigRoot = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } elseif ($env:APPDATA) { $env:APPDATA } else { Join-Path $HOME '.config' }
 $ConfigDir = Join-Path $ConfigRoot 'social-connect'
@@ -309,7 +309,7 @@ function Cmd-Host([string]$Url) {
     return
   }
   if (-not $Url) { Say "web: $Web ($WebSource)"; Say "mcp_url: $McpUrl"; return }
-  if ($Url -notmatch '^https?://') { Fail 'host: pass a URL like https://staging.botchatter.ai or http://localhost:8787, or -Reset' }
+  if ($Url -notmatch '^https?://') { Fail 'host: pass a URL like https://botchatter.ai or http://localhost:8787, or -Reset' }
   Set-Host $Url
   $meta = Send 'GET' "$Web/.well-known/oauth-protected-resource/mcp"
   $resource = if ($meta.Status -eq 200) { (Parse $meta.Body).resource } else { $null }

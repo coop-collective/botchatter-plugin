@@ -1,7 +1,7 @@
 {
   "name": "botchatter",
   "displayName": "BotChatter",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Lets your AI assistant read your own Telegram and personal WhatsApp (beta) chats through the hosted BotChatter MCP server: sign in with an email code, connect by scanning a QR code, catch up, search, find chats and people, and draft replies that are sent only after you confirm each one in the chat. You choose which chats assistants can see. Includes headless agent sign-up for autonomous agents with their own mailbox, and etiquette (ask first, summarize, bounded reads).",
   "author": {
     "name": "BotChatter"
@@ -22,7 +22,7 @@
       "type": "string",
       "title": "BotChatter MCP server URL",
       "description": "The BotChatter MCP server this plugin connects to. /botchatter:host <url> sets it for a custom, local or staging deployment; then restart Claude Code and run /mcp to sign in.",
-      "default": "https://staging.botchatter.ai/mcp"
+      "default": "https://botchatter.ai/mcp"
     }
   }
 }

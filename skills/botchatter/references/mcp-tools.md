@@ -1,6 +1,6 @@
 # BotChatter MCP tools
 
-Server: `botchatter`, streamable HTTP at `<host>/mcp` (default `https://staging.botchatter.ai/mcp`),
+Server: `botchatter`, streamable HTTP at `<host>/mcp` (default `https://botchatter.ai/mcp`),
 protected by OAuth 2.1 (PKCE S256, dynamic client registration at `/oauth/register`, Client ID
 Metadata Documents). Scope: `telegram` (it covers both providers). An unauthenticated request
 answers 401 with a `WWW-Authenticate` challenge pointing to `/.well-known/oauth-protected-resource/mcp`.
@@ -58,7 +58,7 @@ private conversation with that person. Opening it gives a connect-only session.
 
 - Telegram: scan the QR code in Telegram under Settings → Devices → Link Desktop Device, or tap
   the `tg://` link on the phone that has Telegram.
-- WhatsApp (beta, not yet tested against a real account): the link opens `/connect/whatsapp`;
+- WhatsApp (beta, unofficial linked device): the link opens `/connect/whatsapp`;
   scan the QR code in WhatsApp under Settings → Linked devices → Link a device. The QR code must
   be on a computer or another screen, not on the phone that scans it.
 

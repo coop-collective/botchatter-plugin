@@ -33,7 +33,7 @@
 set -u
 umask 077
 
-DEFAULT_WEB=https://staging.botchatter.ai
+DEFAULT_WEB=https://botchatter.ai
 CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/social-connect
 HOST_FILE=$CONFIG_DIR/host
 REDIRECT_URI=http://127.0.0.1:8976/callback
@@ -465,7 +465,7 @@ cmd_host() {
       say "claude_code: printf '%s' '{\"mcp_url\":\"$DEFAULT_WEB/mcp\"}' | claude plugin configure botchatter@botchatter --values-stdin"
       return 0 ;;
     http://* | https://*) ;;
-    *) die "host: pass a URL like https://staging.botchatter.ai or http://localhost:8787, or --reset" ;;
+    *) die "host: pass a URL like https://botchatter.ai or http://localhost:8787, or --reset" ;;
   esac
   WEB=${1%/}
   meta=$(curl -fsS --max-time 20 "$WEB/.well-known/oauth-protected-resource/mcp") ||

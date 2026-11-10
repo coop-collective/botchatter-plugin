@@ -1,6 +1,6 @@
 # Contributing
 
-This repository holds only the BotChatter plugin for Claude Code and Codex (skill, commands,
+This repository holds only the BotChatter plugin for Grok Bot, ChatGPT / Dots, Claude Code, Codex and Cursor (skill, commands,
 MCP configuration and the agent sign-up scripts). The BotChatter service and its MCP server
 live in a separate repository.
 

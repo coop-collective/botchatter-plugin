@@ -6,17 +6,19 @@ cd "$(dirname "$0")/.."
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 ok() { printf 'ok: %s\n' "$*"; }
 
-for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .mcp.json .codex-mcp.json package.json; do
+for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .cursor-plugin/plugin.json mcp.json .mcp.json .codex-mcp.json package.json; do
   jq -e . "$f" >/dev/null || fail "$f is not valid JSON"
 done
 ok "JSON files parse"
 
-default=https://staging.botchatter.ai/mcp
+default=https://botchatter.ai/mcp
 # shellcheck disable=SC2016 # the literal placeholder Claude Code substitutes
 [ "$(jq -r '.mcpServers["botchatter"].url' .mcp.json)" = '${user_config.mcp_url}' ] || fail ".mcp.json must use the mcp_url option"
 [ "$(jq -r '.userConfig.mcp_url.default' .claude-plugin/plugin.json)" = "$default" ] || fail "mcp_url default"
 [ "$(jq -r '.mcpServers' .codex-plugin/plugin.json)" = ./.codex-mcp.json ] || fail "codex manifest must point at .codex-mcp.json"
 [ "$(jq -r '.mcpServers["botchatter"].url' .codex-mcp.json)" = "$default" ] || fail "codex MCP url must be literal"
+[ "$(jq -r '.mcpServers["botchatter"].url' mcp.json)" = "$default" ] || fail "Cursor/Grok MCP url must use production"
+[ "$(jq -r '.version' .cursor-plugin/plugin.json)" = "$(jq -r '.version' .codex-plugin/plugin.json)" ] || fail "Cursor/Grok version must match"
 for k in name version description license; do
   [ "$(jq -r ".$k" .claude-plugin/plugin.json)" = "$(jq -r ".$k" .codex-plugin/plugin.json)" ] || fail "manifests disagree on $k"
 done

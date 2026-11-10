@@ -4,7 +4,7 @@
     "name": "BotChatter"
   },
   "metadata": {
-    "description": "BotChatter's plugin for Claude Code and Codex: read your own Telegram and WhatsApp chats from your assistant through the BotChatter MCP server, with human approval for every reply."
+    "description": "BotChatter's open-source plugin for supported ChatGPT / Dots, Grok Bot, Claude Code, Codex and Cursor hosts: read your own Telegram and WhatsApp chats through the BotChatter MCP server, with human approval for every reply."
   },
   "plugins": [
     {

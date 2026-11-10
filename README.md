@@ -1,212 +1,203 @@
-# BotChatter plugin for Claude Code and Codex
+# BotChatter plugin
 
-BotChatter lets your AI assistant read your own Telegram and personal WhatsApp chats and
-send replies you confirm yourself. It is a hosted remote MCP server: you sign in with an
-email code, connect Telegram or WhatsApp by scanning a QR code, and then ask your assistant to catch you
-up, find a chat or draft a reply. Your assistant drafts a reply, shows you the chat and the exact
-text, and sends that exact draft only after you say yes in the chat, and then exactly once; reads never mark your messages as read,
-and you choose which chats assistants can see. Your messages, contacts and
-connection credentials are encrypted with a key that only you, and the AI apps you connect, can
-unlock; we don't keep that key. We connect to WhatsApp only while you're using your assistant;
-messages that arrive while you're away are fetched next time, within WhatsApp's limits.
+The open-source **BotChatter plugin** connects your assistant to your own Telegram and
+personal WhatsApp accounts. It bundles the MCP connection, account-setup instructions,
+and a skill for reading chats, catching up, searching, managing Telegram folders, and
+drafting replies. Every reply requires your confirmation before it is sent.
 
-**WhatsApp support is beta:** it has not yet been tested against a real account.
+- **Website and setup prompts:** [botchatter.ai](https://botchatter.ai/start)
+- **Public source:** [coop-collective/botchatter-plugin](https://github.com/coop-collective/botchatter-plugin)
+- **Download:** [plugin ZIP](https://github.com/coop-collective/botchatter-plugin/archive/refs/heads/main.zip)
+- **Production MCP endpoint:** `https://botchatter.ai/mcp`
+- **License:** [MIT](LICENSE)
 
-This plugin connects Claude Code or Codex to that server and teaches the agent how to use it:
-when to read (only when you ask), how much (bounded reads), how to summarize, how to propose a
-reply without pressuring you, how to handle "not connected" and Telegram rate limits, and how
-an autonomous agent with its own mailbox can sign itself up.
+This repository contains the plugin, skills, and helper scripts. The hosted service is
+separate. You do not need access to its private source repository to install this plugin.
 
 ## Install
 
-**Claude Code**
+**Install and enable the plugin before connecting accounts.** Download the ZIP or use
+`git clone https://github.com/coop-collective/botchatter-plugin.git`, then follow the
+instructions for your assistant below. Marketplace installers can fetch the source directly.
+A downloaded folder or an MCP connection alone is not a completed plugin installation:
+verify that the host has enabled BotChatter and loaded its `botchatter` skill.
 
-```bash
+Open [the setup page](https://botchatter.ai/start), choose your assistant and accounts, and
+copy the generated prompt. It requires plugin installation before sign-in and pairing.
+If your host cannot import plugins, complete the required host/admin setup before continuing.
+The public GitHub repository does not imply a listing in an assistant's public directory.
+
+### Grok Bot
+
+1. Open [BotChatter setup](https://botchatter.ai/start?assistant=grok) and choose the bot's
+   inbox or your own email. Download the plugin using the link on that page.
+2. Paste the setup prompt into Grok Bot. It tells the bot to read this README, install the
+   repository through a supported plugin-import mechanism, and load
+   [`skills/botchatter/SKILL.md`](skills/botchatter/SKILL.md).
+3. Confirm that BotChatter is installed and enabled in the host. The package includes
+   `.cursor-plugin/plugin.json` for compatible Cursor/Grok plugin hosts. If your Grok Bot
+   version does not offer repository/plugin import, have it explain the supported install
+   path available to your account and pause. Adding a custom MCP app alone does not install
+   the skill. Do not assume that a Cursor desktop install also installs a cloud Bot's plugin.
+4. Continue with the generated prompt. In **bot inbox** mode, Grok requests an email code
+   and receives an agent key. In **my email** mode, it redeems the one-time setup code from
+   the signed-in setup page. Save the returned Authorization header in the host's secret
+   settings and configure the installed plugin's MCP connection; never commit the key or
+   paste it into chat. Reuse that connection rather than adding a duplicate MCP server.
+5. The bot verifies `connection_status`, shows the pairing disclosures, and connects your
+   selected accounts after you agree. Scan the QR code and let it check for completion.
+
+The plugin does not bypass host approvals or team policies. Grok's connected apps and
+computer credentials have different access models; see
+[Work with Grok Bot](https://cursor.com/docs/grok-bot/work).
+
+### ChatGPT / Dots
+
+Dots use plugins installed and enabled in **ChatGPT**. A local Codex CLI install or a ZIP
+on your computer alone does not make the plugin available to a cloud Dot.
+
+For a ChatGPT workspace with GitHub marketplace imports:
+
+1. A workspace admin opens **Admin → Plugins → Add → Import marketplace**.
+2. Enter `https://github.com/coop-collective/botchatter-plugin` as the source. Leave the path
+   empty; the marketplace is at the repository root. Import and review BotChatter.
+3. Install and enable BotChatter from your workspace's Plugins directory, then authenticate
+   its MCP connection through OAuth using your email.
+4. Start a new conversation if needed, make the plugin available to your Dot, and paste the
+   prompt from [BotChatter setup](https://botchatter.ai/start?assistant=dots).
+5. Ask the Dot to verify the installed skill and call `connection_status` before pairing.
+
+For a personal account, use a supported plugin import/install tool if your ChatGPT
+surface provides one. If it does not, the Dot must explain that limitation and pause;
+this repository is not a promise of a public-directory listing. Manually creating a
+Developer mode MCP app supplies tools but does not install this plugin's bundled skill.
+
+Official guidance: [GitHub marketplace import](https://learn.chatgpt.com/docs/enterprise/plugin-management),
+[plugins](https://learn.chatgpt.com/docs/plugins), and
+[Dots app access](https://learn.chatgpt.com/docs/dots/computers-and-apps#connect-apps).
+
+### Claude Code
+
+```sh
 claude plugin marketplace add coop-collective/botchatter-plugin
 claude plugin install botchatter@botchatter
 ```
 
-**Codex**
+Start a new session. Open `/mcp`, select the plugin's BotChatter connection, and sign in
+through OAuth. Then ask Claude to use the BotChatter skill and call `connection_status`.
+These commands are for **Claude Code**, not an assertion that claude.ai imports repositories.
 
-```bash
+### Codex
+
+```sh
 codex plugin marketplace add coop-collective/botchatter-plugin
 codex plugin add botchatter@botchatter
 ```
 
-**Updating.** Claude Code: `claude plugin marketplace update botchatter`, then
-`claude plugin update botchatter@botchatter`. Codex: `codex plugin marketplace upgrade
-botchatter`, then `codex plugin add botchatter@botchatter`.
+Start a new session, enable the plugin, and authenticate its MCP connection when prompted.
+Check that the `botchatter` skill and tools are available. This installs into that Codex
+host; use the ChatGPT instructions above for a cloud Dot.
 
-## Sign in and connect Telegram or WhatsApp
+### Cursor
 
-The plugin registers one MCP server, `botchatter`, at `https://staging.botchatter.ai/mcp` over
-HTTP with OAuth (no header, no token in a file). Sign in once:
+Import the repository into a supported team marketplace, or use a local plugin install:
 
-```bash
-claude mcp login plugin:botchatter:botchatter   # or /mcp inside a session
-codex mcp login botchatter                          # Codex keeps the credential in the OS keychain
+```sh
+git clone https://github.com/coop-collective/botchatter-plugin.git ~/.cursor/plugins/local/botchatter
 ```
 
-A browser tab opens: enter your email and the 6-digit code it sends you, then approve the
-assistant. The first time, it shows a recovery code once: save it in a password manager (it
-unlocks your data in a new browser). If no Telegram account is connected yet, the button reads **Allow and connect
-Telegram**: read the disclosure, then scan the QR code with Telegram on your phone
-(**Settings → Devices → Link Desktop Device**), or tap the `tg://` link if you are on the phone.
-The browser then returns you to your assistant. Skipped it? Run `/botchatter:connect`.
+If the destination already exists, update that checkout instead of overwriting it. Reload
+Cursor and check **Customize** for BotChatter's skill and MCP connection. Local imports
+must be allowed by your workspace policy. Authenticate the MCP connection through OAuth.
+See [Cursor's plugin installation guide](https://cursor.com/docs/plugins#test-plugins-locally).
 
-**WhatsApp (beta):** `/botchatter:connect whatsapp` (or "Allow and connect WhatsApp" when
-signing in). Open the link on a computer or a second screen, not on your phone, then in
-WhatsApp on the phone go to **Settings → Linked devices → Link a device** and scan the QR code.
-WhatsApp only has the messages that arrived while it was connected, so older history may be
-missing; the assistant will say so.
+### Other MCP clients
 
-A connect link is valid for 30 minutes and also unlocks your encrypted data for 2 hours, so
-keep it to yourself.
+Use a client that can install this plugin format and load its skill. An MCP-only client
+can reach the server, but that is a tools-only integration, not the plugin installation
+required by the landing-page setup flow. [`AGENTS-snippet.md`](AGENTS-snippet.md) is a
+manual integration reference for developers, not an installation-success check.
 
-## What it adds
+## Connect your accounts
 
-| Piece | What it does |
-|---|---|
-| Skill `botchatter` | Loaded when you ask about your Telegram or WhatsApp messages, connecting an account, or BotChatter: the tools, the sign-in and connect flow, agent sign-up, and etiquette (ask first, at most 20 chats and 30 messages per call, summarize rather than dump, never pressure you to approve, give the connect link when not connected, wait out rate limits). |
-| `/botchatter:connect [telegram\|whatsapp]` | Gets a 30-minute connect link from the MCP server and shows it to you only, with the QR steps. |
-| `/botchatter:host <url>` | Uses a custom host (self-hosted, local or staging) for the MCP server and agent sign-up, saved across sessions; `--reset` goes back to the default. |
-| `.mcp.json` | The `botchatter` MCP server (HTTP, OAuth) at the plugin's `mcp_url` option (default `https://staging.botchatter.ai/mcp`). Codex reads `.codex-plugin/plugin.json` and the literal `.codex-mcp.json` instead. |
-| `scripts/agent-signup.sh`, `.ps1` | Headless sign-up for an autonomous agent with its own mailbox (below). |
-| `AGENTS-snippet.md` | The same guidance, compact, to paste into an `AGENTS.md` for agents without plugins (Cursor, Copilot, Gemini CLI). |
+After installation and authentication, ask: “Use BotChatter to connect my Telegram and
+WhatsApp.” The assistant calls `start_connect`, shows the risks, waits for your agreement,
+and then shows a QR code. Telegram also supports phone-number login.
 
-## Tools
+- **Telegram:** Settings → Devices → Link Desktop Device. If Telegram requires a two-step
+  password, enter it on the returned browser page; never give it to the assistant in chat.
+- **WhatsApp:** Settings → Linked devices → Link a device. Display the QR code on another
+  screen so your phone can scan it. WhatsApp support is beta and uses an unofficial client.
 
-| Tool | What it does |
-|---|---|
-| `connection_status` | Which accounts are connected, and WhatsApp history import progress |
-| `connect_account({provider})` | A 30-minute link (with a 2-hour device unlock) for you to open and scan the QR code |
-| `catch_up({provider?, since?, max_chats, per_chat})` | One call for "what's new": active chats since the last catch-up, each with its latest messages |
-| `get_mentions({provider?, limit})` | Messages that @mention you or reply to you |
-| `list_recent_chats({limit ≤ 20, provider?})` | Your most recent chats across Telegram and WhatsApp |
-| `find_chats({query, type?, provider?})` | Any chat or group by name, not only recent ones |
-| `get_chat_info({chat_ref})` | A group's description and members, or the other person in a private chat |
-| `find_contacts({query, provider?})` | People by name, username or number (phone numbers masked) |
-| `read_recent_messages({chat_ref, limit ≤ 30, before?})` | `{provider, messages, sync?}` for one chat, paging back with `before`; never marks anything read. WhatsApp's `sync.state: "partial"` means older messages may be missing |
-| `get_message_context({chat_ref, message_id})` | The conversation around one message |
-| `search_messages({query, provider?, chat_ref?, type?})` | Search all chats or one chat |
-| `get_media({chat_ref, message_id})` | Opens one photo, voice note or file (up to 5 MB); nothing is stored |
-| `draft_reply({chat_ref, text})` | Queues one reply and sends nothing; returns a `draft_id` (valid 15 minutes). Your assistant shows you the chat and exact text and asks you to confirm |
-| `send_reply({draft_id, user_confirmation})` | After you say yes, sends exactly that draft, once; the result says `sent` (Pro plan). Your app may ask you to allow the call too |
-| `get_privacy_settings()` | Your blocklist or allowlist mode and how many rules exist |
-| `apply_privacy_rules({mode?, rules, user_confirmation})` | Hides or shows the chats you confirmed in the chat |
-| `start_connect`, `check_connect`, `connect_with_phone`, `submit_login_code`, `cancel_connect` | Connect an account right in the chat (QR image, or Telegram by phone) |
-| `get_web_sign_in_link({page?})` | A one-click link that opens your authenticated account without another email or sign-in step; use `page:"settings"` for reply permissions |
+A successful link and a completed history import are separate states. The Accounts page
+updates WhatsApp history progress automatically and shows **Sync complete** when reported
+by the connector. Recent history depth depends on what your phone supplies. A partial
+sync is not proof that older messages do not exist.
 
-MCP prompts: `catch_me_up`, `draft_replies`, `classify_chats_for_privacy`. Chats you hide are
-invisible to every connected assistant, and an assistant changes privacy rules only after you
-confirm the exact changes. All approval happens in your assistant's chat; the BotChatter
-website's Replies page is a read-only record of every reply and what happened.
+Ask your assistant to call `get_web_sign_in_link` when you want to open your account or
+settings. It returns a one-time link without making you repeat email sign-in. Save your
+recovery code securely when it is first issued; do not put it in the plugin repository.
 
-To let your assistant send confirmed replies, ask it to open BotChatter settings. It returns
-a one-click account link, including when the account uses its Grok Bot email. Under
-**Settings → Reply permissions**, turn on **Let my assistant app approve sends** and select
-**Save reply permissions**. Your assistant app must ask before each send, and you still
-confirm each exact draft in the chat.
+## Use BotChatter
 
-## Agent sign-up (autonomous agents)
+- “Catch me up on my chats since yesterday.”
+- “Find the message about Friday's appointment.”
+- “Show my Telegram folders and watch my Work folder for new messages.”
+- “Draft a reply to Alice.” The assistant shows the chat and exact text and waits for your
+  approval before `send_reply` sends the draft.
+- “Hide my work chats from assistants.” The assistant proposes the precise privacy changes
+  for your approval.
 
-An agent that has its own mailbox (Grok, a hosted bot, any autonomous agent) can create and own a
-BotChatter account without a browser, then give its human a link to connect Telegram:
+Reads do not mark messages as read. Your messages and credentials are encrypted under
+user-specific keys; the hosted service processes authorized requests with the keys
+presented for those requests. WhatsApp reads and searches cover captured/imported data
+and must report incomplete history honestly.
 
-```bash
+See the [skill](skills/botchatter/SKILL.md) and [tool reference](skills/botchatter/references/mcp-tools.md).
+To enable approved replies, ask for a settings sign-in link and turn on **Let my assistant
+app approve sends** under **Settings → Reply permissions**. Keep per-send confirmation
+in your assistant. The website's Replies page is a record, not a send button.
+
+## Agent scripts and custom hosts
+
+The landing-page Grok prompt uses the current agent-key setup flow. The repository also
+includes shell and PowerShell helpers for an agent with its own mailbox using the OAuth
+sign-up flow. See [agent sign-up](skills/botchatter/references/agent-signup.md).
+
+```sh
 sh scripts/agent-signup.sh signup agent@example.org --agent-name "Example Agent"
-printf '%s\n' "<code from the email>" | sh scripts/agent-signup.sh authorize --code -
-sh scripts/agent-signup.sh connect          # prints connect_url for the human
+# Provide the emailed code through stdin, not a command-line argument:
+sh scripts/agent-signup.sh authorize --code -
 sh scripts/agent-signup.sh status
-sh scripts/agent-signup.sh call catch_up '{"max_chats":10}'
 ```
 
-It needs only `sh`, `curl` and `openssl`: it registers an OAuth client, builds a PKCE S256
-authorize URL (scope `telegram`), trades the emailed code through `POST /api/agent/authorize`,
-exchanges the authorization code at `/oauth/token`, and refreshes the token when it expires.
-Secrets travel on stdin, never on a command line, and are never printed. Tokens go to the macOS
-Keychain or the Linux Secret Service (`secret-tool`), else to a mode-600 file it names
-(`SOCIAL_CONNECT_TOKEN_STORE=file` forces that). The first `authorize` also receives the
-account's **recovery code**, shown once by the server: the script stores it the same way, never
-prints it, and sends it on every later `authorize` for that address (without it the server
-answers 403 `recovery_code_required`). `logout` keeps it; `where` shows where both are stored.
-A recovery code saved elsewhere goes in `SOCIAL_CONNECT_RECOVERY_CODE`. `scripts/agent-signup.ps1` is the PowerShell
-twin; on Windows it keeps the token and recovery code in files encrypted for the current user
-(DPAPI). The raw
-HTTP steps are in
-[skills/botchatter/references/agent-signup.md](skills/botchatter/references/agent-signup.md).
+The scripts store credentials in the OS credential store when available, with a protected
+file fallback. Their existing `SOCIAL_CONNECT_*` environment variables and storage paths
+remain supported for compatibility; the public plugin name is **BotChatter**.
 
-Only accounts created this way can sign in through it; an address that belongs to an account a
-person made in the browser is refused (409).
+New installs default to production. To use a separate staging account, choose
+`https://staging.botchatter.ai/mcp` explicitly. In Claude Code, `/botchatter:host <origin>`
+changes the plugin option. Other hosts must update their installed MCP connection using
+their supported configuration mechanism. Keep staging and production credentials separate.
 
-## Custom host (self-hosted, local, staging)
+## Update and contribute
 
-```bash
-/botchatter:host https://botchatter.example.org   # in Claude Code; --reset goes back
+```sh
+# Claude Code
+claude plugin marketplace update botchatter
+claude plugin update botchatter@botchatter
+
+# Codex
+codex plugin marketplace upgrade botchatter
+codex plugin add botchatter@botchatter
 ```
 
-It runs `agent-signup.sh host <url>`, which checks `<url>/.well-known/oauth-protected-resource/mcp`,
-saves the host in `~/.config/social-connect/host` (`$XDG_CONFIG_HOME`; `%APPDATA%` on Windows)
-and prints a `claude plugin configure botchatter@botchatter --values-stdin` line that sets
-the plugin's `mcp_url`. Restart Claude Code and sign in with `/mcp`. `SOCIAL_CONNECT_WEB=<url>`
-overrides the host for one run. Codex substitutes neither `${VAR}` nor `${user_config.*}` in a
-plugin's MCP file, so it gets its own manifest with a literal URL; for another host add one by
-hand (`codex mcp add botchatter-custom --url <url>`).
+Restart the relevant session after updating. Workspace imports follow their marketplace's
+sync policy; local Git installs can use `git pull --ff-only` in the plugin checkout.
 
-## Without a plugin
+Run `npm test` for offline manifest/script checks, and `claude plugin validate .` to validate
+the Claude package. See [CONTRIBUTING.md](CONTRIBUTING.md). No account credentials belong
+in this repository.
 
-- **Claude (claude.ai, Desktop):** Settings → Connectors → Add custom connector → paste the MCP URL.
-- **Another MCP client:** `claude mcp add --transport http botchatter <url>` or
-  `codex mcp add botchatter --url <url>`, and paste `AGENTS-snippet.md` into `AGENTS.md`.
-
-## Development
-
-```bash
-claude --plugin-dir .          # load this checkout in Claude Code
-claude plugin validate .       # check the marketplace and the plugin manifest
-sh test/script-tests.sh        # manifests agree, shellcheck, offline checks of the sign-up script
-```
-
-| Path | What |
-|---|---|
-| `.claude-plugin/marketplace.json` | The marketplace (one plugin, `botchatter`, at the repository root); Claude Code and Codex both read it |
-| `.claude-plugin/plugin.json` | Plugin manifest for Claude Code (with the `mcp_url` option) |
-| `.codex-plugin/plugin.json`, `.codex-mcp.json` | Codex's manifest (same metadata and version) and its MCP server at a literal URL |
-| `.mcp.json` | MCP server for Claude Code (`${user_config.mcp_url}`) |
-| `commands/` | `/botchatter:connect`, `/botchatter:host` |
-| `skills/botchatter/` | `SKILL.md` plus `references/` (MCP tools, agent sign-up) |
-| `scripts/` | `agent-signup.sh` and its PowerShell twin |
-| `test/` | Script and manifest checks |
-
-## Status of the server side
-
-| Feature | State |
-|---|---|
-| MCP OAuth (email code sign-in, DCR and CIMD), 29 tools and 3 prompts, 30 tool calls a minute per account | Staging (`https://staging.botchatter.ai`) |
-| User-keyed encryption at rest (recovery code, device unlock) | Built (connector HEAD); check staging is deployed |
-| Connect Telegram by QR inside the OAuth trip | Staging |
-| Agent sign-up (`/api/agent/*`, with the recovery code) | Built; check `GET <host>/api/agent/` answers JSON before relying on it |
-| Sending a confirmed reply (`draft_reply`, the user confirms in the chat, `send_reply(draft_id)`; once, exactly as drafted; ambiguous failures never retried; Pro plan) | Staging |
-| Privacy rules (blocklist or allowlist; applied after the user confirms in the chat) | Staging |
-| Personal WhatsApp (connect by QR, merged chat list, partial-history `sync`) | **Beta**: built (connector HEAD), not yet tested against a real account |
-
-Update the skill, the snippet and this table when those change.
-
-## License
-
-[MIT](LICENSE). Copyright 2026 Coop.
-
-## Grok Bot and Cursor
-
-This repository is also a Cursor plugin (`.cursor-plugin/plugin.json`, `mcp.json`, `assets/logo.svg`), which is the
-format Grok Bot uses for connectors.
-
-- **Grok Bot:** Connect apps → Add → custom MCP server `https://staging.botchatter.ai/mcp`, then sign in with your email
-  code and approve. In chat, say "connect my Telegram" (or WhatsApp): BotChatter shows the risks, then a QR code right
-  in the chat to scan from your phone (Telegram: Settings → Devices → Link Desktop Device; WhatsApp: Settings → Linked
-  devices). Telegram can also connect with your phone number and login code. If anything needs a browser (Telegram
-  two-step password), you get a link.
-- **Cursor:** add `{"mcpServers":{"botchatter":{"url":"https://staging.botchatter.ai/mcp"}}}` to `~/.cursor/mcp.json`,
-  or install this repo as a plugin.
-- The connector uses OAuth (no tokens in this repo). Privacy policy: https://staging.botchatter.ai/privacy-policy ·
-  Terms: https://staging.botchatter.ai/terms
+[Privacy policy](https://botchatter.ai/privacy-policy) · [Terms](https://botchatter.ai/terms) ·
+[Support](mailto:support@botchatter.ai)

@@ -8,11 +8,32 @@ description: Read the user's own Telegram and personal WhatsApp chats (WhatsApp 
 BotChatter is a hosted remote MCP server (`botchatter`) that lets an assistant read the
 **user's own** Telegram and personal WhatsApp chats and send replies. Sending is two steps:
 `draft_reply` queues the exact text, the user confirms it in the chat, then `send_reply(draft_id)`
-sends exactly that draft, once. **WhatsApp is beta**: it has not yet been tested against a real
-account, so say so when the user connects it or relies on it. Default host: `https://staging.botchatter.ai` (MCP at `/mcp`); a custom
+sends exactly that draft, once. **WhatsApp is beta** and uses an unofficial linked-device client. Show the server’s risk disclosure before pairing. Default host: `https://botchatter.ai` (MCP at `/mcp`); a custom
 host is set with `/botchatter:host <url>`.
 
-## Tools (server `botchatter`, 29)
+## Installation and host setup
+
+Use the public source at https://github.com/coop-collective/botchatter-plugin and the
+[README installation guide](../../README.md#install). Install and enable the plugin before
+connecting accounts; downloading a folder or adding only an MCP server does not complete
+this step. Check the host's installed-plugin state and that this skill is available. If the
+host cannot import plugins, explain the required user/admin action and stop setup there.
+
+- **Grok Bot:** use its supported plugin import, then the prompt from https://botchatter.ai/start.
+  It covers either the bot's inbox or the person's one-time setup code. Configure the installed
+  plugin's MCP connection using the returned Authorization header in the host's secret store;
+  never write that header into this repository or create a second BotChatter server.
+- **ChatGPT / Dots:** install and enable the plugin in ChatGPT (workspace admins can import
+  this GitHub marketplace), authenticate its MCP connection through OAuth, then make it
+  available to the Dot. A Codex CLI install alone does not install a cloud Dot's plugin.
+- **Claude Code / Codex / Cursor:** follow the README's host-specific installation steps,
+  restart the session if required, authenticate, and call `connection_status`.
+
+After pairing, distinguish a linked account from a completed history import. Report the
+history state and progress returned by `connection_status`; do not keep presenting Cancel
+as the next action after a successful link. Do not claim a full archive from a partial sync.
+
+## Tools (server `botchatter`)
 
 | Need | Tool |
 |---|---|
@@ -63,8 +84,7 @@ page is a read-only record: never tell the user to send a draft from there.
 WhatsApp): pass it back unchanged, never invent or edit one. Say which app a chat is from when
 you summarize across both.
 
-**WhatsApp history is partial.** WhatsApp only has the messages that arrived while it was
-connected. When `sync.state` is `"partial"`, older messages may be missing: say so ("I can only
+**WhatsApp history is partial.** WhatsApp imports recent history supplied by the phone when linked and captures messages while connected. Import depth depends on the phone; it is not a guaranteed full archive. When `sync.state` is `"partial"`, older messages may be missing: say so ("I can only
 see messages since <oldest_synced>") instead of claiming there are none or that a conversation
 started there. Never infer silence from a partial sync. The same holds for `catch_up` and
 `search_messages` on WhatsApp: they only see captured messages.
@@ -110,7 +130,7 @@ When an account isn't connected, connect it right here instead of sending the us
    The link opens `/connect/whatsapp`, which shows a QR code. In WhatsApp on the phone:
    **Settings → Linked devices → Link a device**, then scan. The QR code must be shown on a
    computer or another screen, **not on the same phone** that scans it. Mention that WhatsApp
-   support is beta and not yet tested against a real account.
+   support is beta and uses an unofficial linked-device client.
 4. **Later, or if it was skipped:** `/botchatter:connect`, or call `connect_account` and show
    the `connect_url` (valid 30 minutes) to that person only. Wait until they say it is done, then
    `connection_status`. The link is sensitive (see "Connect links" below).

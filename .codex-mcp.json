@@ -2,7 +2,7 @@
   "mcpServers": {
     "botchatter": {
       "type": "http",
-      "url": "https://staging.botchatter.ai/mcp"
+      "url": "https://botchatter.ai/mcp"
     }
   }
 }
